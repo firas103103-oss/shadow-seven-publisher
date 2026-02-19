@@ -1,178 +1,112 @@
 /**
- * Google Gemini AI Client
- * يستبدل base44.integrations.Core.InvokeLLM
+ * Ollama AI Client — يحل محل Google Gemini
+ * متوافق مع OpenAI API (Ollama /v1/chat/completions)
+ *
+ * المتغيرات البيئية:
+ *   VITE_OLLAMA_BASE_URL  → عنوان Ollama (proxy via nginx /ai)
+ *   VITE_OLLAMA_MODEL     → اسم النموذج (default: llama3.2:3b)
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
+const OLLAMA_BASE_URL = import.meta.env.VITE_OLLAMA_BASE_URL || '/ai'
+const DEFAULT_MODEL   = import.meta.env.VITE_OLLAMA_MODEL    || 'llama3.2:3b'
 
-const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY
-
-if (!apiKey) {
-  console.warn('⚠️ Google AI API key not found in environment variables')
-}
-
-const genAI = new GoogleGenerativeAI(apiKey)
-
-// نماذج مختلفة حسب الحاجة
-const models = {
-  pro: 'gemini-pro',
-  proVision: 'gemini-pro-vision',
-  flash: 'gemini-1.5-flash',
-  proLatest: 'gemini-1.5-pro-latest'
-}
-
+// ─────────────────────────────────────────────────────────────
 export class GeminiClient {
-  constructor(modelName = models.flash) {
-    this.model = genAI.getGenerativeModel({ model: modelName })
-    this.chat = null
+  constructor (modelName = DEFAULT_MODEL) {
+    this.model = modelName
   }
 
-  /**
-   * استدعاء LLM مع رسائل متعددة (محاكاة base44.integrations.Core.InvokeLLM)
-   */
-  async invokeLLM({ messages, temperature = 0.7, max_tokens = 4000 }) {
+  /* استدعاء LLM بقائمة رسائل (محاكاة base44 InvokeLLM) */
+  async invokeLLM ({ messages, temperature = 0.7, max_tokens = 4000 }) {
     try {
-      // تحويل الرسائل من صيغة OpenAI إلى Gemini
-      const geminiMessages = this.convertMessages(messages)
-      
-      // إنشاء chat session
-      const chat = this.model.startChat({
-        generationConfig: {
+      const resp = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
           temperature,
-          maxOutputTokens: max_tokens,
-        },
-        history: geminiMessages.history
-      })
-
-      // إرسال الرسالة الأخيرة
-      const result = await chat.sendMessage(geminiMessages.lastMessage)
-      const response = await result.response
-      const text = response.text()
-
-      return {
-        status: 'success',
-        output: text,
-        usage: {
-          prompt_tokens: result.response.promptFeedback?.tokenCount || 0,
-          completion_tokens: text.split(' ').length, // تقريبي
-          total_tokens: result.response.promptFeedback?.tokenCount + text.split(' ').length || 0
-        }
-      }
-    } catch (error) {
-      console.error('Gemini API Error:', error)
-      throw new Error(`فشل استدعاء Gemini: ${error.message}`)
-    }
-  }
-
-  /**
-   * تحويل الرسائل من صيغة OpenAI إلى Gemini
-   */
-  convertMessages(messages) {
-    const history = []
-    let lastMessage = ''
-
-    messages.forEach((msg, index) => {
-      const isLast = index === messages.length - 1
-
-      if (msg.role === 'system') {
-        // System message تضاف كـ user message في Gemini
-        if (!isLast) {
-          history.push({
-            role: 'user',
-            parts: [{ text: msg.content }]
-          })
-        } else {
-          lastMessage = msg.content
-        }
-      } else if (msg.role === 'user') {
-        if (!isLast) {
-          history.push({
-            role: 'user',
-            parts: [{ text: msg.content }]
-          })
-        } else {
-          lastMessage = msg.content
-        }
-      } else if (msg.role === 'assistant') {
-        history.push({
-          role: 'model',
-          parts: [{ text: msg.content }]
+          max_tokens,
+          stream: false
         })
-      }
-    })
-
-    return { history, lastMessage }
-  }
-
-  /**
-   * توليد نص مباشر (بدون تاريخ)
-   */
-  async generateContent(prompt, config = {}) {
-    try {
-      const result = await this.model.generateContent(prompt, {
-        generationConfig: {
-          temperature: config.temperature || 0.7,
-          maxOutputTokens: config.max_tokens || 4000,
-        }
       })
-
-      const response = await result.response
-      return response.text()
+      if (!resp.ok) {
+        const err = await resp.text()
+        throw new Error(`Ollama ${resp.status}: ${err.slice(0,200)}`)
+      }
+      const data = await resp.json()
+      const text = data.choices?.[0]?.message?.content || ''
+      return { status: 'success', output: text, usage: data.usage || {} }
     } catch (error) {
-      console.error('Gemini Generation Error:', error)
-      throw new Error(`فشل التوليد: ${error.message}`)
+      console.error('Ollama invokeLLM error:', error)
+      throw new Error(`فشل استدعاء المساعد الذكي: ${error.message}`)
     }
   }
 
-  /**
-   * محادثة تفاعلية (streaming)
-   */
-  async streamGenerate(prompt, onChunk) {
+  /* توليد نص بسيط */
+  async generateContent (prompt, config = {}) {
     try {
-      const result = await this.model.generateContentStream(prompt)
+      const resp = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model:       this.model,
+          messages:    [{ role: 'user', content: prompt }],
+          temperature: config.temperature ?? 0.7,
+          max_tokens:  config.max_tokens  ?? 4000,
+          stream:      false
+        })
+      })
+      if (!resp.ok) throw new Error(`Ollama ${resp.status}`)
+      const data = await resp.json()
+      return data.choices?.[0]?.message?.content || ''
+    } catch (error) {
+      console.error('Ollama generateContent error:', error)
+      throw new Error(`فشل توليد المحتوى: ${error.message}`)
+    }
+  }
 
+  /* بث streaming */
+  async streamContent (prompt, onChunk, config = {}) {
+    try {
+      const resp = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model:       this.model,
+          messages:    [{ role: 'user', content: prompt }],
+          temperature: config.temperature ?? 0.7,
+          max_tokens:  config.max_tokens  ?? 4000,
+          stream:      true
+        })
+      })
+      if (!resp.ok) throw new Error(`Ollama ${resp.status}`)
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder()
       let fullText = ''
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text()
-        fullText += chunkText
-        if (onChunk) onChunk(chunkText)
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '))
+        for (const line of lines) {
+          const raw = line.slice(6)
+          if (raw === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(raw)
+            const content = parsed.choices?.[0]?.delta?.content || ''
+            if (content) { fullText += content; onChunk(content) }
+          } catch { /* skip */ }
+        }
       }
-
       return fullText
     } catch (error) {
-      console.error('Gemini Stream Error:', error)
-      throw error
-    }
-  }
-
-  /**
-   * تحليل صورة (Gemini Pro Vision)
-   */
-  async analyzeImage(imageData, prompt) {
-    try {
-      const visionModel = genAI.getGenerativeModel({ model: models.proVision })
-      
-      const imageParts = [{
-        inlineData: {
-          data: imageData.split(',')[1], // إزالة data:image/jpeg;base64,
-          mimeType: 'image/jpeg'
-        }
-      }]
-
-      const result = await visionModel.generateContent([prompt, ...imageParts])
-      const response = await result.response
-      return response.text()
-    } catch (error) {
-      console.error('Gemini Vision Error:', error)
-      throw error
+      throw new Error(`فشل streaming: ${error.message}`)
     }
   }
 }
 
-// Instance افتراضي يستخدم gemini-1.5-flash (أسرع وأرخص)
-export const gemini = new GeminiClient(models.flash)
-
-// Instance للمهام المعقدة
-export const geminiPro = new GeminiClient(models.proLatest)
-
-export default gemini
+// ─── instances (backward compat) ────────────────────────────
+export const gemini    = new GeminiClient()
+export const geminiPro = new GeminiClient(DEFAULT_MODEL)
+export default GeminiClient

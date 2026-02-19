@@ -15,6 +15,7 @@ const BookMergerPage = lazy(() => import('@/Pages/BookMergerPage'))
 const CoverDesignerPage = lazy(() => import('@/Pages/CoverDesignerPage'))
 const SettingsPage = lazy(() => import('@/Pages/SettingsPage'))
 const AnalyticsDashboardPage = lazy(() => import('@/Pages/AnalyticsDashboardPage'))
+const SubmitWizardPage = lazy(() => import('@/Pages/SubmitWizardPage'))
 
 import LoadingSpinner from '@/Components/LoadingSpinner'
 
@@ -35,6 +36,7 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/upload" element={<UploadPage />} />
+                <Route path="/submit" element={<SubmitWizardPage />} />
                 <Route path="/manuscripts" element={<ManuscriptsPage />} />
                 <Route path="/elite-editor/:id" element={<EliteEditorPage />} />
                 <Route path="/export" element={<ExportPage />} />
