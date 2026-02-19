@@ -209,8 +209,12 @@ const UploadPage = () => {
       setAnalysisResults(results);
       success('✅ تم التحليل بنجاح! يمكنك الآن الانتقال للخطوة التالية.');
       
-      // TODO: رفع إلى Supabase بعد إنشاء الجداول
-      // await uploadToSupabase(currentFile, results);
+      // Upload to Supabase (enabled - tables exist)
+      try {
+        await uploadToSupabase(currentFile, results);
+      } catch (uploadErr) {
+        console.warn('Supabase upload skipped:', uploadErr.message);
+      }
     }
     
     setAnalyzing(false);

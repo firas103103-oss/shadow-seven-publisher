@@ -26,7 +26,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useToast } from '../Components/ToastProvider';
-import { useManuscripts } from '../hooks/useManuscripts';
+import { useManuscripts, useDeleteManuscript } from '../hooks/useManuscripts';
 import LoadingSpinner from '../Components/LoadingSpinner';
 import ErrorDisplay from '../Components/ErrorDisplay';
 import StatCard from '../Components/StatCard';
@@ -37,6 +37,7 @@ const ManuscriptsPage = () => {
   const navigate = useNavigate();
   const { success, error } = useToast();
   const { data: manuscripts, isLoading, isError } = useManuscripts();
+  const deleteManuscriptMutation = useDeleteManuscript();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -115,10 +116,10 @@ const ManuscriptsPage = () => {
   const handleDelete = async (manuscript) => {
     if (confirm(`هل تريد حذف "${manuscript.title}"؟`)) {
       try {
-        // TODO: API call to delete
+        await deleteManuscriptMutation.mutateAsync(manuscript.id);
         success('تم حذف المخطوط بنجاح');
       } catch (err) {
-        error('فشل حذف المخطوط');
+        error('فشل حذف المخطوط: ' + (err.message || 'خطأ غير معروف'));
       }
     }
   };
