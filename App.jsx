@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import Layout from '@/Components/Layout'
 import ErrorBoundary from '@/Components/ErrorBoundary'
@@ -27,6 +27,12 @@ const PageLoader = () => (
     <LoadingSpinner size="md" text="جاري التحميل..." />
   </div>
 )
+
+// Redirect /manuscripts/:id → /elite-editor/:id
+function ManuscriptsRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/elite-editor/${id}`} replace />
+}
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -60,6 +66,7 @@ function AppRoutes() {
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/submit" element={<SubmitWizardPage />} />
         <Route path="/manuscripts" element={<ManuscriptsPage />} />
+        <Route path="/manuscripts/:id" element={<ManuscriptsRedirect />} />
         <Route path="/elite-editor/:id" element={<EliteEditorPage />} />
         <Route path="/export" element={<ExportPage />} />
         <Route path="/book-merger" element={<BookMergerPage />} />

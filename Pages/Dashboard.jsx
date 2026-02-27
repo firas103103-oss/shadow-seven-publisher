@@ -132,7 +132,7 @@ export default function Dashboard() {
                       {manuscript.status === 'draft' && 'مسودة'}
                     </Badge>
                     <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/manuscripts/${manuscript.id}`}>عرض</Link>
+                      <Link to={`/elite-editor/${manuscript.id}`}>عرض</Link>
                     </Button>
                   </div>
                 </div>
@@ -187,7 +187,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <Link to="/elite-editor">
+            <Link to="/manuscripts">
               <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
                 <div className="p-3 rounded-lg bg-accent">
                   <CheckCircle2 className="h-6 w-6" />
