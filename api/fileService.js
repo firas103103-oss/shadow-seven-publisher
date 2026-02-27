@@ -1,6 +1,6 @@
 /**
  * File Upload & Processing — PostgreSQL عبر Backend
- * يستبدل Supabase Storage
+ * Local backend storage
  */
 
 import { gemini } from './geminiClient'

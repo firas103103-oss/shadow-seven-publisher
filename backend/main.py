@@ -93,6 +93,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Omni-Publisher routes (Stage 1 Intake, Stage 2 Purge)
+from routes.omni_routes import router as omni_router
+app.include_router(omni_router)
+
 
 # ─────────────────────────────────────────────────────────────
 # HELPERS
@@ -106,28 +110,37 @@ def generate_tracking_id() -> str:
 def scrub_text(text: str) -> str:
     """
     Clean and normalize Arabic text
+    - Unicode NFC normalization
+    - Normalize Arabic character variants (Farsi Yeh → Arabic Yeh, etc.)
     - Remove extreme whitespace
-    - Fix common typos
-    - Normalize Arabic characters
+    - Fix excessive punctuation
     """
+    import unicodedata
+    # Unicode NFC normalization
+    text = unicodedata.normalize('NFC', text)
     # Normalize whitespace
     text = re.sub(r'\s+', ' ', text)
     text = text.strip()
-    
-    # Normalize Arabic characters
-    replacements = {
-        'ي': 'ي',  # Normalize yaa
-        'ة': 'ة',  # Normalize taa marbuta
-        'أ': 'أ', 'إ': 'إ', 'آ': 'آ',  # Normalize alef variants
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    
+    # Normalize Arabic character variants (different codepoints, same/similar glyph)
+    # Farsi Yeh (U+06CC) → Arabic Yeh (U+064A)
+    text = text.replace('\u06cc', '\u064a')
+    # Farsi Kaf (U+06A9) → Arabic Kaf (U+0643)
+    text = text.replace('\u06a9', '\u0643')
+    # Alef Maksura (U+0649) → Yeh (U+064A) when used as final yaa
+    text = text.replace('\u0649', '\u064a')
+    # Taa Marbuta alternate (U+06C3) → Taa Marbuta (U+0629)
+    text = text.replace('\u06c3', '\u0629')
+    # Alef variants → standard Alef (U+0627)
+    text = text.replace('\u0671', '\u0627')
+    text = text.replace('\u0672', '\u0627')
+    text = text.replace('\u0673', '\u0627')
+    text = text.replace('\u0675', '\u0627')
+    # Yeh barree (U+06D2) → standard Yeh (U+064A)
+    text = text.replace('\u06d2', '\u064a')
     # Remove excessive punctuation
     text = re.sub(r'[.]{3,}', '...', text)
     text = re.sub(r'[!]{2,}', '!', text)
     text = re.sub(r'[?]{2,}', '?', text)
-    
     return text
 
 
@@ -181,7 +194,7 @@ async def trigger_n8n_workflow(tracking_id: str, request_data: dict):
 
 
 # ─────────────────────────────────────────────────────────────
-# AUTH ROUTES (PostgreSQL — بديل PostgREST/Supabase)
+# AUTH ROUTES (PostgreSQL)
 # ─────────────────────────────────────────────────────────────
 
 from pydantic import BaseModel as PydanticBase

@@ -16,6 +16,7 @@ const ManuscriptsPage = lazy(() => import('@/Pages/ManuscriptsPage'))
 const EliteEditorPage = lazy(() => import('@/Pages/EliteEditorPage'))
 const BookMergerPage = lazy(() => import('@/Pages/BookMergerPage'))
 const CoverDesignerPage = lazy(() => import('@/Pages/CoverDesignerPage'))
+const OmniDashboard = lazy(() => import('@/Pages/OmniDashboard'))
 const SettingsPage = lazy(() => import('@/Pages/SettingsPage'))
 const AnalyticsDashboardPage = lazy(() => import('@/Pages/AnalyticsDashboardPage'))
 const SubmitWizardPage = lazy(() => import('@/Pages/SubmitWizardPage'))
@@ -55,6 +56,7 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/omni" element={<OmniDashboard />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/submit" element={<SubmitWizardPage />} />
         <Route path="/manuscripts" element={<ManuscriptsPage />} />

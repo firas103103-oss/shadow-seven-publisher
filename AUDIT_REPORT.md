@@ -82,7 +82,7 @@ cmd = "npx serve -s dist --listen tcp://0.0.0.0:${PORT:-3000}"
   "react": "^19.0.0",
   "react-dom": "^19.0.0",
   "vite": "^7.3.1",
-  "@supabase/supabase-js": "^2.46.0",
+  # PostgreSQL via FastAPI - لا حاجة لـ supabase
   "@google/generative-ai": "^0.21.0"
 }
 ```
@@ -129,7 +129,7 @@ No errors found.
 - ✓ جميع الـ Contexts (2 contexts)
 
 #### Backend/API
-- ✓ Supabase Client
+- ✓ Backend API Client
 - ✓ Gemini AI Client
 - ✓ File Service
 - ✓ API Index
@@ -163,8 +163,7 @@ No errors found.
 ### متطلبات البيئة:
 ```env
 PORT=3000 (default)
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_key
+VITE_API_URL=https://your-api-domain.com
 VITE_GEMINI_API_KEY=your_gemini_key
 ```
 

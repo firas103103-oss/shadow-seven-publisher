@@ -143,7 +143,7 @@ const UploadPage = () => {
     ));
   };
 
-  // رفع إلى Backend المحلي (يستبدل Supabase Storage)
+  // رفع إلى Backend المحلي
   const uploadToBackend = async (fileObj, analysisResults) => {
     try {
       updateFileStatus(fileObj.id, 'analyzing', 80);
@@ -196,7 +196,7 @@ const UploadPage = () => {
       setAnalysisResults(results);
       success('✅ تم التحليل بنجاح! يمكنك الآن الانتقال للخطوة التالية.');
 
-      // Upload to local backend (replaces Supabase Storage)
+      // Upload to local backend
       try {
         await uploadToBackend(fileObj, results);
       } catch (uploadErr) {

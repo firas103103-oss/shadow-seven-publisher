@@ -253,7 +253,8 @@ ${contentSample}
 
     try {
       const response = await this._processWithRetry(prompt, { max_tokens: 4000 });
-      const designPackage = this._extractJSON(response);
+      const text = response?.output ?? (typeof response === 'string' ? response : '{}');
+      const designPackage = this._extractJSON(text);
       
       return {
         success: true,
@@ -361,15 +362,16 @@ ${contentSample}
    * استخراج JSON من الرد
    */
   _extractJSON(response) {
+    const text = response?.output ?? (typeof response === 'string' ? response : '{}');
     try {
-      return JSON.parse(response);
+      return JSON.parse(text);
     } catch (e) {
-      const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[1]);
       }
       
-      const objectMatch = response.match(/\{[\s\S]*\}/);
+      const objectMatch = text.match(/\{[\s\S]*\}/);
       if (objectMatch) {
         return JSON.parse(objectMatch[0]);
       }

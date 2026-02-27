@@ -1,6 +1,5 @@
 /**
  * Backend API Client — PostgreSQL عبر FastAPI
- * يستبدل Supabase بالكامل
  */
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -121,6 +120,25 @@ export async function uploadManuscriptFile(file, metadata = {}) {
   return res.json()
 }
 
+// ─── Omni-Publisher (1-7 files, 200k words) ───────────────────
+export const omniApi = {
+  upload: async (formData) => {
+    const url = baseUrl('/api/shadow7/omni/upload')
+    const res = await fetch(url, { method: 'POST', body: formData })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || err.message || res.statusText)
+    }
+    return res.json()
+  },
+  purge: async (trackingId) => {
+    return fetchApi('/api/shadow7/omni/purge', {
+      method: 'POST',
+      body: JSON.stringify({ tracking_id: trackingId })
+    })
+  }
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────
 export async function getDashboardStats() {
   try {
@@ -141,4 +159,4 @@ export async function getDashboardStats() {
   }
 }
 
-export default { authApi, manuscriptsApi, uploadManuscriptFile, getDashboardStats }
+export default { authApi, manuscriptsApi, uploadManuscriptFile, getDashboardStats, omniApi }

@@ -219,7 +219,7 @@ ETag: W/"451-oGbFpgrvMerdVTr3nBY40uwNKuQ"
 - توليد أغلفة فعلية عبر Canvas مع تحميل/حفظ: [Pages/CoverDesignerPage.jsx](Pages/CoverDesignerPage.jsx)
 - دمج كتب فعلي (متسلسل/متداخل) مع TOC وملاحظات صفحات: [Pages/BookMergerPage.jsx](Pages/BookMergerPage.jsx)
 - مساعد كتابة محلي بدل الموك: [Pages/EliteEditorPage.jsx](Pages/EliteEditorPage.jsx)
-- إضافة CRUD لمخطوطات داخل apiClient وربط بـ Supabase: [api/index.js](api/index.js)
+- إضافة CRUD لمخطوطات داخل apiClient وربط بـ PostgreSQL: [api/index.js](api/index.js)
 - توافق ESM في إعدادات Vite/Vitest بإضافة __dirname: [vite.config.js](vite.config.js), [vitest.config.js](vitest.config.js)
 
 ## نتائج البناء

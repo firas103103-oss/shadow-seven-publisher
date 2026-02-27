@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     # Ollama AI
     OLLAMA_URL: str = "http://nexus_ollama:11434"
     OLLAMA_MODEL: str = "llama3.2:3b"
+    # Gemini (for Omni-Publisher Purge)
+    GEMINI_API_KEY: str = ""
     OLLAMA_TIMEOUT: int = 300  # 5 minutes for long generations
     
     # n8n Webhook
@@ -36,13 +38,13 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = "/var/www/shadow7/storage"
     EXPORTS_PATH: str = "/var/www/shadow7/exports"
     MANUSCRIPTS_PATH: str = "/var/www/shadow7/storage/manuscripts"
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB (unified with manuscripts for 200k words)
     MAX_MANUSCRIPT_UPLOAD: int = 100 * 1024 * 1024  # 100MB for 100k-word docs + ZIP
     MAX_MULTIPART_PART_SIZE: int = 100 * 1024 * 1024  # 100MB — overrides Starlette 1MB default
     
-    # Limits
+    # Limits (unified: Upload + Submit honor 200k max)
     MIN_WORDS: int = 500
-    MAX_WORDS: int = 3000
+    MAX_WORDS: int = 200000
     TARGET_WORD_COUNT: int = 15000  # Output target
     CHAPTER_COUNT: int = 10
     

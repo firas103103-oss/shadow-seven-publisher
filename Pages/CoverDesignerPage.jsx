@@ -1,11 +1,11 @@
 /**
  * CoverDesignerPage - مصمم أغلفة الكتب بالذكاء الاصطناعي
- * 
+ *
  * الميزات:
- * - تصميم أغلفة بالذكاء الاصطناعي
+ * - تصميم أغلفة Canvas للمعاينة السريعة
+ * - DesignCoverAgent: توليد Prompts حقيقية لـ Midjourney/DALL-E/Stable Diffusion
  * - قوالب جاهزة
- * - تخصيص كامل (ألوان، خطوط، صور)
- * - معاينة فورية
+ * - تخصيص كامل (ألوان، خطوط)
  * - تصدير بجودة عالية
  */
 
@@ -22,12 +22,19 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  Wand2
+  Wand2,
+  Copy,
+  Check,
+  FileText
 } from 'lucide-react';
 import { useToast } from '../Components/ToastProvider';
+import { useManuscripts } from '../hooks/useManuscripts';
+import DesignCoverAgent from '../utils/agents/DesignCoverAgent';
 
 const CoverDesignerPage = () => {
   const { success, error, info, warning } = useToast();
+  const { data: manuscripts = [] } = useManuscripts();
+  const [designAgent] = useState(() => new DesignCoverAgent());
 
   const [coverData, setCoverData] = useState({
     title: '',
@@ -40,10 +47,13 @@ const CoverDesignerPage = () => {
     textColor: '#ffffff'
   });
 
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState(null);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCovers, setGeneratedCovers] = useState([]);
   const [currentCoverIndex, setCurrentCoverIndex] = useState(0);
+  const [aiDesignPackage, setAiDesignPackage] = useState(null);
+  const [copiedPromptIndex, setCopiedPromptIndex] = useState(null);
 
   const generateCoverImage = (data, variant = 0) => {
     if (typeof document === 'undefined') return '';
@@ -150,7 +160,7 @@ const CoverDesignerPage = () => {
     { id: 6, name: 'الأناقة', preview: '💎', style: 'elegant' }
   ];
 
-  // توليد غلاف بالذكاء الاصطناعي
+  // توليد غلاف بالذكاء الاصطناعي (Canvas + DesignCoverAgent لـ Midjourney/DALL-E)
   const handleGenerateAI = async () => {
     if (!coverData.title.trim()) {
       error('يرجى إدخال عنوان الكتاب');
@@ -158,7 +168,9 @@ const CoverDesignerPage = () => {
     }
 
     setIsGenerating(true);
+    setAiDesignPackage(null);
     try {
+      // 1. Canvas previews (فوري)
       const variants = [0, 1, 2, 3];
       const newCovers = variants.map((variant) => ({
         id: `${Date.now()}-${variant}`,
@@ -166,17 +178,42 @@ const CoverDesignerPage = () => {
         style: coverData.style,
         prompt: `غلاف ${coverData.genre} بأسلوب ${coverData.style}`
       }));
-
       setGeneratedCovers(newCovers);
       setCurrentCoverIndex(0);
-      success('تم توليد تصاميم جاهزة للتحميل');
-      
+
+      // 2. DesignCoverAgent: توليد Prompts حقيقية لـ Midjourney/DALL-E/Stable Diffusion
+      const selectedManuscript = manuscripts.find((m) => m.id === selectedManuscriptId);
+      const manuscriptForAgent = {
+        title: coverData.title,
+        author: coverData.author,
+        content: selectedManuscript?.content || '',
+        genre: coverData.genre,
+        targetAudience: 'عام',
+        mood: coverData.style
+      };
+      const result = await designAgent.generateCoverDesignPackage(manuscriptForAgent);
+      const pkg = result?.data || result?.fallback;
+      if (pkg && (pkg.aiPrompts?.length > 0 || pkg.designConcepts?.length > 0)) {
+        setAiDesignPackage(pkg);
+        success('تم توليد تصاميم Canvas و Prompts لـ Midjourney/DALL-E');
+      } else {
+        success('تم توليد تصاميم Canvas جاهزة للتحميل');
+      }
     } catch (err) {
       console.error('Generation error:', err);
+      setGeneratedCovers((prev) => prev.length > 0 ? prev : []);
       error('فشل التوليد');
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const copyPromptToClipboard = (text, index) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopiedPromptIndex(index);
+      success('تم نسخ الـ Prompt');
+      setTimeout(() => setCopiedPromptIndex(null), 2000);
+    });
   };
 
   // حفظ الغلاف
@@ -252,6 +289,36 @@ const CoverDesignerPage = () => {
                 <Type className="w-5 h-5 text-shadow-accent" />
                 معلومات الكتاب
               </h2>
+
+              {manuscripts.length > 0 && (
+                <div className="mb-3">
+                  <label className="block text-sm text-shadow-text/60 mb-1">مخطوطة (لتحسين الـ Prompts)</label>
+                  <select
+                    value={selectedManuscriptId || ''}
+                    onChange={(e) => {
+                      const id = e.target.value || null;
+                      setSelectedManuscriptId(id);
+                      const m = manuscripts.find((x) => x.id === id);
+                      if (m) {
+                        setCoverData((prev) => ({
+                          ...prev,
+                          title: m.title || prev.title,
+                          author: m.author || prev.author,
+                          genre: m.metadata?.genre || prev.genre
+                        }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-shadow-bg border border-shadow-primary/30 rounded-lg text-shadow-text focus:outline-none focus:border-shadow-accent transition-colors"
+                  >
+                    <option value="">-- يدوي --</option>
+                    {manuscripts.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.title || 'بدون عنوان'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div>
@@ -489,6 +556,56 @@ const CoverDesignerPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* AI Prompts لـ Midjourney / DALL-E / Stable Diffusion */}
+            {aiDesignPackage?.aiPrompts && aiDesignPackage.aiPrompts.length > 0 && (
+              <div className="cyber-card bg-shadow-surface rounded-lg border border-shadow-primary/20 p-4">
+                <h2 className="text-lg font-bold text-shadow-text mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-shadow-accent" />
+                  Prompts جاهزة لـ Midjourney / DALL-E / Stable Diffusion
+                </h2>
+                <div className="space-y-4">
+                  {aiDesignPackage.aiPrompts.map((prompt, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 bg-shadow-bg rounded-lg border border-shadow-primary/20 space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-shadow-accent uppercase">
+                          {prompt.generator || 'AI Art'}
+                        </span>
+                        <button
+                          onClick={() => copyPromptToClipboard(prompt.positivePrompt || '', idx)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs cyber-button bg-shadow-primary/20 hover:bg-shadow-accent/20 transition-colors"
+                        >
+                          {copiedPromptIndex === idx ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                          نسخ
+                        </button>
+                      </div>
+                      <p className="text-sm text-shadow-text/90 font-mono whitespace-pre-wrap break-words">
+                        {prompt.positivePrompt}
+                      </p>
+                      {prompt.negativePrompt && (
+                        <p className="text-xs text-shadow-text/60">
+                          <span className="font-semibold">تجنب:</span> {prompt.negativePrompt}
+                        </p>
+                      )}
+                      {prompt.settings && (
+                        <p className="text-xs text-shadow-text/50">
+                          {typeof prompt.settings === 'object'
+                            ? JSON.stringify(prompt.settings)
+                            : prompt.settings}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

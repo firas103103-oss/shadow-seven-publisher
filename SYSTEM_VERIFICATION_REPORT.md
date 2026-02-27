@@ -24,12 +24,8 @@
 ### ✅ المتغيرات المكونة حاليًا
 
 ```env
-# قاعدة البيانات - Supabase
-✅ VITE_SUPABASE_URL=https://udcwitnnogxrvoxefrge.supabase.co
-✅ VITE_SUPABASE_ANON_KEY=[محمي]
-✅ SUPABASE_URL=[محمي]
-✅ SUPABASE_KEY=[محمي]
-✅ SUPABASE_JWT_SECRET=[محمي]
+# قاعدة البيانات - PostgreSQL
+✅ VITE_API_URL=[عنوان Backend API]
 ✅ DATABASE_URL=[محمي]
 
 # الذكاء الاصطناعي - Google Gemini
@@ -264,7 +260,7 @@ NODE_ENV = "production"                      ✅
 /workspaces/777.../
 ├── api/                                     ✅ 4 ملفات
 │   ├── index.js                             ✅ توحيد API
-│   ├── supabaseClient.js                    ✅ قاعدة البيانات
+│   ├── backendClient.js                     ✅ Backend API
 │   ├── geminiClient.js                      ✅ AI
 │   └── fileService.js                       ✅ رفع الملفات
 │
@@ -321,21 +317,14 @@ NODE_ENV = "production"                      ✅
 
 ## 🔌 4. الاتصالات والخدمات (Connections & Services)
 
-### ✅ Supabase
+### ✅ Backend API
 ```javascript
-// api/supabaseClient.js
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL  ✅ متصل
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ✅ متصل
+// api/backendClient.js
+const API_BASE = import.meta.env.VITE_API_URL  ✅ متصل
 
-export const supabase = createClient(...)   ✅
-export const db = {
-  manuscripts: { list, get, create, update, delete } ✅
-  complianceRules: { ... }                  ✅
-  coverDesigns: { ... }                     ✅
-  processingJobs: { ... }                   ✅
-}
-export const auth = { ... }                 ✅
-export const storage = { ... }              ✅
+export const authApi = { login, register, validate, logout }
+export const manuscriptsApi = { list, get, create, update, delete }
+export const omniApi = { upload, purge }
 ```
 
 **الحالة:** ✅ متصل وجاهز
@@ -369,7 +358,7 @@ const models = {
 ```javascript
 // api/fileService.js
 class FileService {
-  static async uploadFile(file)             ✅ يرفع إلى Supabase Storage
+  static async uploadFile(file)             ✅ يرفع إلى Backend
   static async extractDataFromFile(file)    ✅ يستخرج النص
   static async extractTextFromTxt(file)     ✅
   static async extractTextFromDocx(file)    ✅ mammoth
@@ -394,8 +383,7 @@ class FileService {
 ✓ .env.example موجود
 ✓ build script موجود
 ✓ preview script موجود
-✓ VITE_SUPABASE_URL محدد
-✓ VITE_SUPABASE_ANON_KEY محدد
+✓ VITE_API_URL محدد
 ✓ VITE_GOOGLE_AI_API_KEY محدد
 ✓ .env في .gitignore
 ✓ البناء نجح
@@ -516,8 +504,7 @@ git push origin main
 # 3. New Project → Deploy from GitHub
 
 # 4. أضف المتغيرات البيئية:
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
+VITE_API_URL=...
 VITE_GOOGLE_AI_API_KEY=...
 
 # 5. Deploy! 🚀
@@ -532,8 +519,7 @@ docker build -t shadow-seven .
 
 # Run
 docker run -p 5005:5005 \
-  -e VITE_SUPABASE_URL=... \
-  -e VITE_SUPABASE_ANON_KEY=... \
+  -e VITE_API_URL=... \
   -e VITE_GOOGLE_AI_API_KEY=... \
   shadow-seven
 ```
@@ -586,7 +572,7 @@ npx serve -s dist -p 5005
    - يمكن تفعيله لاحقًا إذا احتجت المصادقة
 
 2. Collaboration Features - موجود لكن بحاجة لتكوين إضافي
-   - يحتاج Realtime setup في Supabase
+   - Collaboration محلي
 
 3. Analytics - موجود لكن بحاجة لخدمة Analytics
    - يمكن ربطه مع Google Analytics أو Mixpanel

@@ -1,17 +1,23 @@
 /**
  * Export Page - صفحة التصدير الرئيسية
- * 
+ *
  * واجهة كاملة لتصدير الكتب وإنشاء حزمة Agency in a Box
+ * يجلب المخطوطات من API ويسمح باختيار مخطوطة للتصدير
  */
 
 import { useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, FileText, AlertCircle } from 'lucide-react';
 import { ExportOptions, ExportProgress, PackagePreview, ExportResults } from '../Components/export';
 import useExportManager from '../hooks/useExportManager';
+import { useManuscripts, useManuscript } from '../hooks/useManuscripts';
 
 const ExportPage = () => {
-  const [selectedManuscript] = useState(null);
+  const { data: manuscripts = [], isLoading: manuscriptsLoading } = useManuscripts();
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  const { data: manuscriptDetail } = useManuscript(selectedManuscriptId);
+  const selectedManuscript = manuscriptDetail ?? manuscripts.find((m) => m.id === selectedManuscriptId) ?? null;
 
   const {
     isProcessing,
@@ -26,43 +32,37 @@ const ExportPage = () => {
     reset
   } = useExportManager();
 
-  // بيانات تجريبية للمخطوطة (في الواقع ستأتي من props أو context)
-  const demoManuscript = {
-    id: '123',
-    title: 'رحلة في عالم الخيال',
-    author: 'محمد أحمد',
-    content: `كان ياما كان في قديم الزمان...
-    
-    هذا نص تجريبي للمخطوطة. في التطبيق الفعلي، سيتم جلب المحتوى من قاعدة البيانات.
-    
-    الفصل الأول: البداية
-    في صباح يوم مشرق، بدأت القصة...
-    
-    الفصل الثاني: المغامرة
-    وفي يوم آخر، حدثت أحداث مثيرة...`,
-    chapters: [
-      {
-        title: 'الفصل الأول: البداية',
-        content: 'في صباح يوم مشرق، بدأت القصة...'
-      },
-      {
-        title: 'الفصل الثاني: المغامرة',
-        content: 'وفي يوم آخر، حدثت أحداث مثيرة...'
+  // تحويل المخطوطة إلى صيغة متوافقة مع ExportModule (content, chapters, title, author)
+  const manuscriptForExport = selectedManuscript
+    ? {
+        id: selectedManuscript.id,
+        title: selectedManuscript.title || 'بدون عنوان',
+        author: selectedManuscript.author || '',
+        content: selectedManuscript.content || '',
+        chapters: Array.isArray(selectedManuscript.chapters)
+          ? selectedManuscript.chapters.map((ch) =>
+              typeof ch === 'object' && ch !== null
+                ? { title: ch.title || '', content: ch.content || '' }
+                : { title: String(ch), content: '' }
+            )
+          : [],
+        genre: selectedManuscript.metadata?.genre,
+        targetAudience: selectedManuscript.metadata?.targetAudience,
+        mood: selectedManuscript.metadata?.mood
       }
-    ]
-  };
+    : null;
 
-  // معالجة التصدير
   const handleExport = async (exportConfig) => {
+    if (!manuscriptForExport) {
+      return;
+    }
     try {
-      const manuscript = selectedManuscript || demoManuscript;
-      await exportWithAgency(manuscript, exportConfig);
+      await exportWithAgency(manuscriptForExport, exportConfig);
     } catch (err) {
       console.error('Export failed:', err);
     }
   };
 
-  // بدء تصدير جديد
   const handleNewExport = () => {
     reset();
     setShowPreview(false);
@@ -87,41 +87,80 @@ const ExportPage = () => {
 
         {/* المحتوى الرئيسي */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* العمود الأيسر: الخيارات والتقدم */}
           <div className="space-y-6">
-            {/* معلومات المخطوطة */}
-            {!results && (
-              <div className="cyber-card bg-shadow-surface rounded-lg border border-shadow-primary/20 p-6">
-                <h3 className="text-lg font-semibold text-shadow-text mb-4">
-                  المخطوطة المحددة
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-shadow-text/60">العنوان:</span>
-                    <span className="text-shadow-text font-semibold">
-                      {demoManuscript.title}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-shadow-text/60">المؤلف:</span>
-                    <span className="text-shadow-text font-semibold">
-                      {demoManuscript.author}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-shadow-text/60">الفصول:</span>
-                    <span className="text-shadow-text font-semibold">
-                      {demoManuscript.chapters?.length || 0}
-                    </span>
-                  </div>
+            {/* اختيار المخطوطة */}
+            <div className="cyber-card bg-shadow-surface rounded-lg border border-shadow-primary/20 p-6">
+              <h3 className="text-lg font-semibold text-shadow-text mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-shadow-accent" />
+                اختر المخطوطة للتصدير
+              </h3>
+
+              {manuscriptsLoading ? (
+                <div className="py-8 text-center text-shadow-text/60">
+                  <div className="w-8 h-8 border-2 border-shadow-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  جاري تحميل المخطوطات...
                 </div>
-              </div>
-            )}
+              ) : manuscripts.length === 0 ? (
+                <div className="py-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-2" />
+                  <p className="text-shadow-text/80">لا توجد مخطوطات بعد</p>
+                  <p className="text-sm text-shadow-text/60 mt-1">
+                    ارفع مخطوطة من صفحة الرفع أولاً
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <select
+                    value={selectedManuscriptId || ''}
+                    onChange={(e) => setSelectedManuscriptId(e.target.value || null)}
+                    className="w-full px-4 py-3 bg-shadow-bg border border-shadow-primary/30 rounded-lg text-shadow-text focus:outline-none focus:border-shadow-accent transition-colors"
+                  >
+                    <option value="">-- اختر مخطوطة --</option>
+                    {manuscripts.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.title || 'بدون عنوان'} ({m.word_count || 0} كلمة)
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedManuscript && (
+                    <div className="space-y-2 pt-2 border-t border-shadow-primary/20">
+                      <div className="flex justify-between">
+                        <span className="text-shadow-text/60">العنوان:</span>
+                        <span className="text-shadow-text font-semibold">
+                          {selectedManuscript.title || 'بدون عنوان'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-shadow-text/60">المؤلف:</span>
+                        <span className="text-shadow-text font-semibold">
+                          {selectedManuscript.author || '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-shadow-text/60">الفصول:</span>
+                        <span className="text-shadow-text font-semibold">
+                          {Array.isArray(selectedManuscript.chapters)
+                            ? selectedManuscript.chapters.length
+                            : 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-shadow-text/60">الكلمات:</span>
+                        <span className="text-shadow-text font-semibold">
+                          {(selectedManuscript.word_count || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* خيارات التصدير */}
-            {!isProcessing && !results && (
+            {!isProcessing && !results && manuscriptForExport && (
               <ExportOptions
-                manuscript={demoManuscript}
+                manuscript={manuscriptForExport}
                 onExport={handleExport}
               />
             )}
@@ -159,8 +198,7 @@ const ExportPage = () => {
 
           {/* العمود الأيمن: المعاينة */}
           <div className="space-y-6">
-            {/* زر المعاينة */}
-            {!showPreview && !results && (
+            {!showPreview && !results && manuscriptForExport && (
               <button
                 onClick={() => setShowPreview(true)}
                 className="w-full cyber-card bg-shadow-surface rounded-lg border-2 border-shadow-accent/30 p-8 hover:border-shadow-accent/60 transition-all group"
@@ -179,11 +217,10 @@ const ExportPage = () => {
               </button>
             )}
 
-            {/* المعاينة */}
-            {(showPreview || results) && (
+            {(showPreview || results) && manuscriptForExport && (
               <PackagePreview
                 agencyData={{
-                  manuscript: demoManuscript,
+                  manuscript: manuscriptForExport,
                   exports: results?.agencyData?.exports || {},
                   marketing: results?.agencyData?.marketing || {
                     catchyTitles: ['عنوان جذاب 1', 'عنوان جذاب 2'],
@@ -218,7 +255,6 @@ const ExportPage = () => {
               />
             )}
 
-            {/* معلومات إضافية */}
             {!results && (
               <div className="cyber-card bg-shadow-surface rounded-lg border border-shadow-primary/20 p-6 space-y-4">
                 <h3 className="text-lg font-bold text-shadow-text">
@@ -255,13 +291,11 @@ const ExportPage = () => {
           </div>
         </div>
 
-        {/* تذييل */}
         <div className="text-center text-shadow-text/40 text-sm mt-12">
           <p>🌟 صُنع بحب بواسطة الظل السابع - Shadow Seven Agency v4.0</p>
         </div>
       </div>
 
-      {/* Cyber Grid Background */}
       <div className="fixed inset-0 pointer-events-none opacity-10 cyber-grid -z-10" />
     </div>
   );

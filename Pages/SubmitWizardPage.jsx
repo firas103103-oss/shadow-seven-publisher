@@ -114,14 +114,14 @@ const SubmitWizardPage = () => {
     if (wordCount < 500) {
       errors.push(`النص قصير جداً (${wordCount} كلمة). الحد الأدنى: 500 كلمة`);
     }
-    if (wordCount > 5000) {
-      errors.push(`النص طويل جداً (${wordCount} كلمة). الحد الأقصى: 5000 كلمة`);
+    if (wordCount > 200000) {
+      errors.push(`النص طويل جداً (${wordCount} كلمة). الحد الأقصى: 200,000 كلمة`);
     }
     if (arabicRatio < 30) {
       errors.push(`نسبة العربية منخفضة (${arabicRatio.toFixed(0)}%). يجب ألا تقل عن 30%`);
     }
     
-    const isValid = errors.length === 0 && wordCount >= 500 && wordCount <= 5000;
+    const isValid = errors.length === 0 && wordCount >= 500 && wordCount <= 200000;
     
     setValidation({ wordCount, arabicRatio, isValid, errors });
     return isValid;
@@ -143,8 +143,8 @@ const SubmitWizardPage = () => {
       return;
     }
     
-    if (file.size > 10 * 1024 * 1024) {
-      error('حجم الملف كبير جداً. الحد الأقصى: 10MB');
+    if (file.size > 100 * 1024 * 1024) {
+      error('حجم الملف كبير جداً. الحد الأقصى: 100MB');
       return;
     }
     
@@ -327,7 +327,7 @@ const SubmitWizardPage = () => {
             setFormData(prev => ({ ...prev, rawText: e.target.value }));
             validateText(e.target.value);
           }}
-          placeholder="الصق مخطوطتك هنا... (500-5000 كلمة)"
+          placeholder="الصق مخطوطتك هنا... (500-200,000 كلمة)"
           className="w-full h-64 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
           dir="rtl"
         />
@@ -335,7 +335,7 @@ const SubmitWizardPage = () => {
       
       {/* Validation Stats */}
       <div className="flex items-center gap-4 text-sm">
-        <div className={`flex items-center gap-2 ${validation.wordCount >= 500 && validation.wordCount <= 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
+        <div className={`flex items-center gap-2 ${validation.wordCount >= 500 && validation.wordCount <= 200000 ? 'text-green-400' : 'text-yellow-400'}`}>
           <span>📝</span>
           <span>{validation.wordCount.toLocaleString()} كلمة</span>
         </div>

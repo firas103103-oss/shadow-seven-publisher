@@ -33,8 +33,7 @@
 
 ```bash
 # .env.production (مطلوب)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_production_anon_key
+VITE_API_URL=https://your-api-domain.com
 VITE_GOOGLE_AI_API_KEY=your_production_gemini_key
 VITE_ENVIRONMENT=production
 VITE_ENABLE_ANALYTICS=true

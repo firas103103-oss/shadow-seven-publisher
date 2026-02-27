@@ -10,3 +10,9 @@ coverage/
 .next/
 .nuxt/
 .output/
+
+# Python
+backend/venv/
+backend/__pycache__/
+*.pyc
+*.pyo

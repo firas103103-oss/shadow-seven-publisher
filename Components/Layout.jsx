@@ -11,7 +11,8 @@ import {
   BarChart3,
   Palette,
   Send,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 const navigation = [
   { name: 'لوحة التحكم', href: '/', icon: LayoutDashboard },
+  { name: 'Omni-Publisher', href: '/omni', icon: Zap },
   { name: 'رفع مخطوط', href: '/upload', icon: Upload },
   { name: 'تقديم مخطوط', href: '/submit', icon: Send },
   { name: 'المخطوطات', href: '/manuscripts', icon: FileText },

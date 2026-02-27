@@ -11,7 +11,7 @@
 
 ### 1. إزالة البيانات المزيفة (Mock Data)
 ```
-✅ AnalyticsDashboardPage  → بيانات حية من Supabase
+✅ AnalyticsDashboardPage  → بيانات حية من PostgreSQL
 ✅ CoverDesignerPage      → توليد Canvas فعلي
 ✅ BookMergerPage         → دمج حقيقي للمخطوطات
 ✅ EliteEditorPage        → محسّنات نصية محلية
@@ -68,7 +68,7 @@ API Layer:       ✅ CRUD كامل
 │
 ├─ API Layer
 │  ├─ api/index.js                   ✅ CRUD كامل
-│  ├─ Supabase integration           ✅
+│  ├─ PostgreSQL integration         ✅
 │  └─ File upload service            ✅
 │
 └─ Config
@@ -231,8 +231,8 @@ npm run build
 
 ### قريب (Priority: Medium)
 ```bash
-# إضافة Supabase Mocks للاختبارات
-npm install @supabase/supabase-js
+# إضافة Mocks للاختبارات (إذا لزم)
+# npm install ...
 
 # إكمال اختبار 34 الفاشل
 # توقيع providers في test setup

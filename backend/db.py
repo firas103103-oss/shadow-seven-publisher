@@ -450,6 +450,76 @@ class DatabaseService:
             return True
 
     # ─────────────────────────────────────────────────────────
+    # OMNI INTAKE (Stage 1 & 2)
+    # ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    async def ensure_omni_intake_table(conn) -> None:
+        """Create omni_intake table for Omni-Publisher pipeline"""
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.omni_intake (
+                tracking_id TEXT PRIMARY KEY,
+                merged_content TEXT NOT NULL,
+                word_count INTEGER NOT NULL,
+                file_count INTEGER NOT NULL,
+                encoding TEXT,
+                purge_report JSONB,
+                purged_content TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+
+    @staticmethod
+    async def create_omni_intake(data: dict) -> dict:
+        """Store intake result for purge stage"""
+        async with get_connection() as conn:
+            await DatabaseService.ensure_omni_intake_table(conn)
+            await conn.execute("""
+                INSERT INTO public.omni_intake (
+                    tracking_id, merged_content, word_count, file_count, encoding
+                ) VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (tracking_id) DO UPDATE SET
+                    merged_content = EXCLUDED.merged_content,
+                    word_count = EXCLUDED.word_count,
+                    file_count = EXCLUDED.file_count,
+                    encoding = EXCLUDED.encoding,
+                    updated_at = NOW()
+            """,
+                data['tracking_id'], data['merged_content'], data['word_count'],
+                data['file_count'], data.get('encoding', 'UTF-8')
+            )
+            row = await conn.fetchrow(
+                "SELECT * FROM public.omni_intake WHERE tracking_id = $1",
+                data['tracking_id']
+            )
+            return dict(row)
+
+    @staticmethod
+    async def get_omni_intake(tracking_id: str) -> Optional[dict]:
+        """Get intake record by tracking_id"""
+        async with get_connection() as conn:
+            await DatabaseService.ensure_omni_intake_table(conn)
+            row = await conn.fetchrow(
+                "SELECT * FROM public.omni_intake WHERE tracking_id = $1",
+                tracking_id
+            )
+            return dict(row) if row else None
+
+    @staticmethod
+    async def update_omni_purge(tracking_id: str, purge_report: dict, purged_content: str = None) -> bool:
+        """Update intake with purge results"""
+        async with get_connection() as conn:
+            result = await conn.execute("""
+                UPDATE public.omni_intake SET
+                    purge_report = $2::jsonb,
+                    purged_content = COALESCE($3, purged_content),
+                    updated_at = NOW()
+                WHERE tracking_id = $1
+            """, tracking_id, json.dumps(purge_report) if isinstance(purge_report, dict) else purge_report, purged_content)
+            return result == "UPDATE 1"
+
+    # ─────────────────────────────────────────────────────────
     # LOGS
     # ─────────────────────────────────────────────────────────
     

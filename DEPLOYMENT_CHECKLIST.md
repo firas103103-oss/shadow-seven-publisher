@@ -20,9 +20,8 @@
 ### 3. المتغيرات البيئية المطلوبة
 
 #### متغيرات إلزامية:
-- [ ] `VITE_SUPABASE_URL` - عنوان مشروع Supabase
-- [ ] `VITE_SUPABASE_ANON_KEY` - مفتاح Supabase العام
-- [ ] `VITE_GOOGLE_AI_API_KEY` - مفتاح Google Gemini AI
+- [ ] `VITE_API_URL` - عنوان Backend API (FastAPI)
+- [ ] `VITE_GOOGLE_AI_API_KEY` - مفتاح Google Gemini AI (اختياري)
 
 #### متغيرات اختيارية:
 - [ ] `VITE_API_BASE_URL` - عنوان API الأساسي (اختياري)

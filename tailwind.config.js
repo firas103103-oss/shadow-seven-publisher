@@ -65,6 +65,7 @@ export default {
         'neon-purple': '0 0 20px rgba(138, 43, 226, 0.5)',
         'cyber': '0 4px 20px rgba(168, 85, 247, 0.2)',
         'card': '0 4px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(168, 85, 247, 0.3)',
+        'glow': '0 0 24px rgba(168, 85, 247, 0.4)',
       },
       backgroundImage: {
         'nexus-gradient': 'linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a0a1a 100%)',

@@ -1,5 +1,5 @@
 /**
- * Collaboration Context — بدون Supabase Realtime
+ * Collaboration Context — Local sync
  * يمكن إضافة WebSocket لاحقاً للتعاون المباشر
  */
 

@@ -24,8 +24,8 @@
 |------|---------|-------|
 | `TextAnalyzerEnhanced.js` | استيراد الأنظمة الجديدة | دمج الوكلاء والتحقق |
 | `PublishingStandards` | معايير 2026 | إضافة تحقق لغوي |
-| `.env.example` | Supabase + Gemini | تحديث المتغيرات |
-| `package.json` | Dependencies | mammoth, supabase, gemini |
+| `.env.example` | PostgreSQL | تحديث المتغيرات |
+| `package.json` | Dependencies | mammoth, gemini |
 
 ---
 
@@ -140,26 +140,19 @@ const results = await agentCoordinator.processWithAgents(text, {
 | [README.md](./README.md) | توثيق v3.0 كامل |
 | [SYSTEM_LOGIC_ANALYSIS.md](./SYSTEM_LOGIC_ANALYSIS.md) | تحليل النظام والمقارنة |
 | [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md) | دليل النشر |
-| [MIGRATION_TO_SUPABASE.md](./MIGRATION_TO_SUPABASE.md) | دليل Migration |
+| Migration docs | قديمة — PostgreSQL فقط |
 | [.env.railway](./.env.railway) | متغيرات جاهزة للنسخ |
 
 ---
 
 ## 🚀 ما يجب أن تفعله الآن
 
-### أولاً: إعداد Supabase
+### أولاً: إعداد Backend
 ```bash
-1. اذهب إلى https://supabase.com
-2. أنشئ مشروع جديد
-3. في SQL Editor، نفذ:
-   - manuscripts table
-   - compliance_rules table
-   - cover_designs table
-   - processing_jobs table
-4. في Storage، أنشئ bucket: manuscripts
-5. انسخ:
-   - SUPABASE_URL
-   - SUPABASE_ANON_KEY
+1. شغّل PostgreSQL + FastAPI backend
+2. أنشئ الجداول المطلوبة (manuscripts, etc.)
+3. انسخ:
+   - VITE_API_URL (عنوان الـ API)
 ```
 
 ### ثانياً: إعداد Google Gemini
@@ -176,8 +169,7 @@ const results = await agentCoordinator.processWithAgents(text, {
 2. New Project → Deploy from GitHub repo
 3. اختر: mrf103/777777777777777777777777777777
 4. في Variables، انسخ من .env.railway:
-   - VITE_SUPABASE_URL=...
-   - VITE_SUPABASE_ANON_KEY=...
+   - VITE_API_URL=...
    - VITE_GOOGLE_AI_API_KEY=...
    - NODE_ENV=production
    - PORT=3000
@@ -225,10 +217,10 @@ VITE_GOOGLE_AI_API_KEY=صحيح_وموجود
 ### مشكلة: Database يفشل
 ```bash
 # الحل:
-# تحقق من Supabase:
+# تحقق من PostgreSQL:
 1. Tables موجودة؟
-2. RLS policies صحيحة؟
-3. SUPABASE_URL و ANON_KEY صحيحة؟
+2. DATABASE_URL صحيح؟
+3. Backend متصل؟
 ```
 
 ---

@@ -70,9 +70,9 @@ class SubmitRequestInput(BaseModel):
     
     raw_text: str = Field(
         ..., 
-        min_length=500,
-        max_length=50000,
-        description="Raw manuscript text (500-3000 words recommended)"
+        min_length=100,
+        max_length=2_000_000,
+        description="Raw manuscript text (500-200,000 words)"
     )
     
     target_audience: TargetAudience = Field(
@@ -110,10 +110,10 @@ class SubmitRequestInput(BaseModel):
         
         # Count words
         words = len(v.split())
-        if words < 100:
+        if words < 500:
             raise ValueError(f"النص قصير جداً ({words} كلمة). الحد الأدنى 500 كلمة.")
-        if words > 5000:
-            raise ValueError(f"النص طويل جداً ({words} كلمة). الحد الأقصى 3000 كلمة.")
+        if words > 200000:
+            raise ValueError(f"النص طويل جداً ({words} كلمة). الحد الأقصى 200,000 كلمة.")
         
         # Check for Arabic content
         arabic_chars = len(re.findall(r'[\u0600-\u06FF]', v))

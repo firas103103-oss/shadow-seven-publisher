@@ -51,8 +51,7 @@
 # في Railway Dashboard → Variables → RAW Editor
 # انسخ من .env.example وعدّل القيم:
 
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_URL=https://your-api-domain.com
 VITE_GOOGLE_AI_API_KEY=your_google_ai_api_key
 
 # اختياري

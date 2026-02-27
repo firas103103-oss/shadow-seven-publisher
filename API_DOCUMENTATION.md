@@ -44,30 +44,24 @@ export default {
 
 ## 🔐 Authentication
 
-### Supabase Client
+### Backend API Client
 
-**Location:** `src/api/supabaseClient.js`
+**Location:** `api/backendClient.js`
 
 ```javascript
-import { supabase } from '@/api/supabaseClient';
+import { authApi } from '@/api/backendClient';
 
 // Sign Up
-const { data, error } = await supabase.auth.signUp({
-  email: 'user@example.com',
-  password: 'secure-password'
-});
+const data = await authApi.register(email, password, fullName);
 
 // Sign In
-const { data, error } = await supabase.auth.signInWithPassword({
-  email: 'user@example.com',
-  password: 'secure-password'
-});
+const data = await authApi.login(email, password);
 
 // Sign Out
-const { error } = await supabase.auth.signOut();
+await authApi.logout(token);
 
-// Get Current User
-const { data: { user } } = await supabase.auth.getUser();
+// Validate Session
+const data = await authApi.validate(token);
 ```
 
 ### AuthContext
@@ -874,8 +868,7 @@ function MyComponent() {
 ```bash
 # Required
 VITE_GOOGLE_AI_API_KEY=your-google-ai-api-key
-VITE_SUPABASE_URL=your-supabase-url
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_API_URL=https://your-api-domain.com
 
 # Optional
 VITE_MAX_FILE_SIZE=52428800  # 50MB default

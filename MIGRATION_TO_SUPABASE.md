@@ -1,4 +1,6 @@
-# 🔄 Migration from base44 to Supabase + Google Gemini
+# ⚠️ [قديم — غير مستخدم] Migration from base44 to Supabase + Google Gemini
+
+> **هذا الملف قديم.** المشروع يستخدم الآن PostgreSQL + FastAPI فقط. لا يوجد Supabase.
 
 ## التاريخ: 2026-01-19
 

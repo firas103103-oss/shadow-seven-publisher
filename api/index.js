@@ -1,5 +1,5 @@
 /**
- * API Client — PostgreSQL عبر FastAPI (بديل Supabase)
+ * API Client — PostgreSQL عبر FastAPI
  */
 
 export { authApi, manuscriptsApi, uploadManuscriptFile, getDashboardStats } from './backendClient'

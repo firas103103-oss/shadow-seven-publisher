@@ -33,9 +33,8 @@ git push origin main
 تأكد من تعيين هذه المتغيرات في Railway Dashboard:
 
 ```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
+# Backend API
+VITE_API_URL=https://your-api-domain.com
 
 # Gemini AI Configuration
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
@@ -164,7 +163,7 @@ Application is running!
 
 - [Railway Dashboard](https://railway.app/dashboard)
 - [Railway Docs](https://docs.railway.app)
-- [Supabase Dashboard](https://app.supabase.com)
+- Backend API (FastAPI)
 - [Google AI Studio](https://makersuite.google.com/app/apikey)
 
 ---

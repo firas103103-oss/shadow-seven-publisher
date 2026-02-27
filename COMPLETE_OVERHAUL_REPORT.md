@@ -180,7 +180,7 @@ npm run build
 
 ### بعد الإصلاح
 ```
-✅ بيانات حقيقية من Supabase
+✅ بيانات حقيقية من PostgreSQL
 ✅ 53 مشكلة فقط
 ✅ Build ناجح (20s)
 ✅ 33 اختبار يمر
@@ -328,7 +328,7 @@ git commit -m "Complete project overhaul"
 
 ### قريب (اختياري)
 ```bash
-npm install --save-dev @supabase/supabase-js
+# Mocks للاختبارات (إذا لزم)
 # إكمال test mocks
 npm test -- --coverage
 ```
