@@ -1,0 +1,19 @@
+الجدول,الحقل,النوع,الوصف
+manuscripts,id,UUID,المعرف
+manuscripts,title,TEXT,العنوان
+manuscripts,author,TEXT,المؤلف
+manuscripts,content,TEXT,المحتوى
+manuscripts,chapters,JSONB,الفصول
+manuscripts,word_count,INTEGER,عدد الكلمات
+manuscripts,status,TEXT,الحالة
+manuscripts,file_path,TEXT,مسار الملف
+manuscripts,metadata,JSONB,بيانات إضافية
+manuscripts,created_at,TIMESTAMPTZ,تاريخ الإنشاء
+omni_intake,tracking_id,TEXT,معرف التتبع (PK)
+omni_intake,merged_content,TEXT,المحتوى المدمج
+omni_intake,word_count,INTEGER,عدد الكلمات
+omni_intake,file_count,INTEGER,عدد الملفات
+omni_intake,encoding,TEXT,الترميز
+omni_intake,purge_report,JSONB,تقرير التنظيف
+omni_intake,purged_content,TEXT,المحتوى بعد التنظيف
+omni_intake,created_at,TIMESTAMPTZ,تاريخ الإنشاء

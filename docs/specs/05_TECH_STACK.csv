@@ -1,0 +1,17 @@
+الفئة,التقنية,الإصدار,الاستخدام
+Frontend,React,18.3,واجهة المستخدم
+Frontend,Vite,7.3,بناء وتطوير
+Frontend,Tailwind CSS,3.4,التنسيق
+Frontend,Radix UI,متنوع,مكونات UI
+Frontend,React Router,6.22,التوجيه
+Frontend,Lucide React,0.344,أيقونات
+Frontend,Mammoth,1.11,قراءة DOCX
+Frontend,Recharts,2.12,رسوم بيانية
+Backend,FastAPI,0.115+,API
+Backend,asyncpg,0.29,PostgreSQL
+Backend,uvicorn,0.27,خادم ASGI
+Backend,mammoth,1.6,استخراج DOCX
+Backend,google-generativeai,0.8+,Gemini API
+Database,PostgreSQL,,nexus_db
+AI,Ollama,llama3.2:3b,توليد محلي
+AI,Gemini 1.5 Pro,,تحليل Purge

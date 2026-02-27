@@ -1,0 +1,13 @@
+المتغير,القيمة الافتراضية,الوصف
+Frontend Port,5005,منفذ Vite
+Backend Port,8002,منفذ FastAPI
+VITE_API_URL,فارغ أو نفس المنشأ,عنوان API
+VITE_OLLAMA_BASE_URL,/ai,وكيل Ollama
+VITE_OLLAMA_MODEL,llama3.2:3b,نموذج Ollama
+GEMINI_API_KEY,.env backend,مفتاح Gemini للـ Purge
+DATABASE_URL,postgresql://...nexus_db,اتصال PostgreSQL
+MIN_WORDS,500,أقل كلمات
+MAX_WORDS,200000,أقصى كلمات
+MAX_UPLOAD_SIZE,100MB,أقصى حجم رفع
+Proxy /api,8002,الـ API
+Proxy /ai,11434,Ollama

@@ -1,0 +1,18 @@
+الطريقة,المسار,الوصف,الملف
+GET,/api/shadow7/health,فحص الصحة,main.py
+POST,/api/shadow7/auth/login,تسجيل الدخول,main.py
+POST,/api/shadow7/auth/register,التسجيل,main.py
+POST,/api/shadow7/auth/validate,التحقق من الجلسة,main.py
+POST,/api/shadow7/auth/logout,تسجيل الخروج,main.py
+POST,/api/shadow7/submit,تقديم مخطوط (نص),main.py
+POST,/api/shadow7/upload,رفع ملف واحد,main.py
+POST,/api/shadow7/omni/upload,رفع Omni (1-7 ملفات),omni_routes.py
+POST,/api/shadow7/omni/purge,تنظيف Omni,omni_routes.py
+POST,/api/shadow7/manuscripts/upload,رفع مخطوطة,main.py
+POST,/api/shadow7/manuscripts,إنشاء مخطوطة,main.py
+GET,/api/shadow7/manuscripts,قائمة المخطوطات,main.py
+GET,/api/shadow7/manuscripts/{id},جلب مخطوطة,main.py
+PATCH,/api/shadow7/manuscripts/{id},تحديث مخطوطة,main.py
+DELETE,/api/shadow7/manuscripts/{id},حذف مخطوطة,main.py
+GET,/api/shadow7/track/{id},تتبع الطلب,main.py
+GET,/api/shadow7/download/{id},تحميل ZIP,main.py

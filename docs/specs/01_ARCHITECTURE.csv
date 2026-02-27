@@ -1,0 +1,17 @@
+القسم,العنصر,الوصف,القيمة
+الهيكل العام,النوع,Fullstack Monorepo,Frontend React + Backend FastAPI
+الهيكل العام,المسار الرئيسي,/root/products/shadow-seven-publisher,
+الهيكل العام,الربط NEXUS,core_publisher symlink,NEXUS_PRIME_UNIFIED/planets/SHADOW-7/core_publisher
+الطبقات,Frontend,React 18 + Vite,Port 5005
+الطبقات,Backend,FastAPI + asyncpg,Port 8002
+الطبقات,Database,PostgreSQL (nexus_db),
+الطبقات,AI,Ollama (محلي) + Gemini (Purge),
+المسارات,الرئيسي,/,
+المسارات,Omni-Publisher,/omni,
+المسارات,رفع مخطوط,/upload,
+المسارات,تصدير,/export,
+المسارات,مصمم الغلاف,/cover-designer,
+الحدود,أقل كلمات,500,
+الحدود,أقصى كلمات,200000,
+الحدود,أقصى ملفات Omni,7,
+الحدود,أقصى حجم رفع,100 MB,

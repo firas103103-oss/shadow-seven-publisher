@@ -1,0 +1,19 @@
+النوع,المسار,الوصف
+Frontend,App.jsx,نقطة الدخول والتوجيه
+Frontend,main.jsx,Mount React
+Frontend,vite.config.js,إعداد Vite والـ proxy
+Frontend,Pages/OmniDashboard.jsx,لوحة Omni-Publisher
+Frontend,Pages/ExportPage.jsx,صفحة التصدير
+Frontend,Pages/UploadPage.jsx,صفحة الرفع
+Frontend,Pages/CoverDesignerPage.jsx,مصمم الغلاف
+Frontend,Components/omni/OmniUploadZone.jsx,منطقة رفع Omni
+Frontend,Components/omni/PurgeReportModal.jsx,مودال تقرير التنظيف
+Frontend,Components/Layout.jsx,التخطيط والـ sidebar
+Frontend,api/backendClient.js,عميل API
+Backend,backend/main.py,تطبيق FastAPI
+Backend,backend/config.py,الإعدادات
+Backend,backend/db.py,اتصال PostgreSQL
+Backend,backend/routes/omni_routes.py,مسارات Omni
+Backend,backend/services/intake_service.py,خدمة الاستقبال
+Backend,backend/services/purge_service.py,خدمة التنظيف
+Backend,backend/services/gemini_client.py,عميل Gemini

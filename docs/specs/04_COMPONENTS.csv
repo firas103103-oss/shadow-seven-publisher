@@ -1,0 +1,17 @@
+المكون,المسار,الوظيفة
+OmniDashboard,Pages/OmniDashboard.jsx,لوحة التحكم الرئيسية - 7 مراحل
+OmniUploadZone,Components/omni/OmniUploadZone.jsx,منطقة رفع 1-7 ملفات TXT/DOCX
+PurgeReportModal,Components/omni/PurgeReportModal.jsx,مودال تقرير التنظيف
+Layout,Components/Layout.jsx,التخطيط والتنقل
+ExportOptions,Components/export/ExportOptions.jsx,خيارات التصدير
+ExportResults,Components/export/ExportResults.jsx,نتائج التصدير
+ExportProgress,Components/export/ExportProgress.jsx,تقدم التصدير
+FileValidator,Components/upload/FileValidator.jsx,التحقق من الملفات
+TextAnalyzerEnhanced,Components/upload/TextAnalyzerEnhanced.jsx,تحليل النص
+DesignCoverAgent,utils/agents/DesignCoverAgent.js,وكيل تصميم الغلاف
+MarketingAgent,utils/agents/MarketingAgent.js,وكيل التسويق
+AuthContext,contexts/AuthContext.jsx,سياق المصادقة
+CollaborationContext,contexts/CollaborationContext.jsx,سياق التعاون
+Dialog,Components/ui/dialog.jsx,مودال Radix
+Button,Components/ui/button.jsx,زر
+Progress,Components/ui/progress.jsx,شريط تقدم

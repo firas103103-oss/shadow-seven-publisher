@@ -102,7 +102,7 @@ const ManuscriptsPage = () => {
   };
 
   const handleView = (manuscript) => {
-    navigate(`/manuscripts/${manuscript.id}`);
+    navigate(`/elite-editor/${manuscript.id}`);
   };
 
   const handleEdit = (manuscript) => {
