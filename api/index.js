@@ -1,112 +1,64 @@
 /**
- * API Client - توحيد الوصول إلى Supabase و Gemini
- * يسهّل الانتقال من base44
+ * API Client — PostgreSQL عبر FastAPI (بديل Supabase)
  */
 
-// استيراد Supabase
-export { supabase, db, auth, storage } from './supabaseClient'
-
-// استيراد Gemini
+export { authApi, manuscriptsApi, uploadManuscriptFile, getDashboardStats } from './backendClient'
 export { gemini, geminiPro, GeminiClient } from './geminiClient'
 
-// استيراد File Service
-export { default as fileService } from './fileService'
-
-// Backward compatibility wrapper (لتسهيل الانتقال)
-import { db } from './supabaseClient'
+import { manuscriptsApi, uploadManuscriptFile, getDashboardStats } from './backendClient'
 import { gemini } from './geminiClient'
-import FileService from './fileService'
+
+// Backward compatibility
+export const apiClient = {
+  getManuscripts: (params) => manuscriptsApi.list(params),
+  getManuscript: (id) => manuscriptsApi.get(id),
+  createManuscript: (data) => manuscriptsApi.create(data),
+  updateManuscript: (id, data) => manuscriptsApi.update(id, data),
+  deleteManuscript: (id) => manuscriptsApi.delete(id),
+  uploadFile: (file) => uploadManuscriptFile(file),
+  getDashboardStats
+}
 
 export const api = {
-  // Database entities
   entities: {
-    Manuscript: db.manuscripts,
-    ComplianceRule: db.complianceRules,
-    CoverDesign: db.coverDesigns,
-    ProcessingJob: db.processingJobs
+    Manuscript: {
+      list: manuscriptsApi.list,
+      get: manuscriptsApi.get,
+      create: manuscriptsApi.create,
+      update: manuscriptsApi.update,
+      delete: manuscriptsApi.delete,
+      filter: async (filters) => {
+        const all = await manuscriptsApi.list()
+        return all.filter(m => {
+          for (const [k, v] of Object.entries(filters)) {
+            if (m[k] !== v) return false
+          }
+          return true
+        })
+      }
+    },
+    ComplianceRule: { list: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => {} },
+    CoverDesign: { create: async () => ({}) },
+    ProcessingJob: { filter: async () => [] }
   },
-  
-  // Core integrations
   integrations: {
     Core: {
-      // LLM invocation
       InvokeLLM: async ({ prompt, messages, temperature, max_tokens }) => {
         if (prompt) {
-          // Simple prompt
           const result = await gemini.generateContent(prompt, { temperature, max_tokens })
           return { output: result }
-        } else if (messages) {
-          // Multi-turn conversation
+        }
+        if (messages) {
           return await gemini.invokeLLM({ messages, temperature, max_tokens })
         }
       },
-      
-      // File upload
-      UploadFile: async ({ file }) => {
-        return await FileService.uploadFile(file)
-      },
-      
-      // Extract data from file
-      ExtractDataFromUploadedFile: async ({ file_url, file }) => {
+      UploadFile: async ({ file }) => uploadManuscriptFile(file),
+      ExtractDataFromUploadedFile: async ({ file }) => {
         if (file) {
+          const FileService = (await import('./fileService')).default
           return await FileService.extractDataFromFile(file)
         }
-        throw new Error('File extraction from URL not yet implemented')
-      }
-    }
-  }
-}
-
-// API Client للـ Dashboard
-export const apiClient = {
-  // Manuscripts CRUD
-  async getManuscripts(params = {}) {
-    const { orderBy = '-created_at', limit, filters } = params
-    if (filters && Object.keys(filters).length > 0) {
-      return await db.manuscripts.filter(filters)
-    }
-    return await db.manuscripts.list(orderBy, limit)
-  },
-
-  async getManuscript(id) {
-    return await db.manuscripts.get(id)
-  },
-
-  async createManuscript(data) {
-    return await db.manuscripts.create(data)
-  },
-
-  async updateManuscript(id, data) {
-    return await db.manuscripts.update(id, data)
-  },
-
-  async deleteManuscript(id) {
-    return await db.manuscripts.delete(id)
-  },
-
-  async uploadFile(file, onProgress) {
-    // onProgress غير مدعوم مباشرة هنا؛ FileService لا يدعم progress events حالياً
-    return await FileService.uploadFile(file)
-  },
-
-  getDashboardStats: async () => {
-    try {
-      const manuscripts = await db.manuscripts.list()
-      
-      return {
-        totalManuscripts: manuscripts.length,
-        processing: manuscripts.filter(m => m.status === 'processing').length,
-        completed: manuscripts.filter(m => m.status === 'completed').length,
-        needsReview: manuscripts.filter(m => m.status === 'needs_review').length
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error)
-      // Return default stats if error
-      return {
-        totalManuscripts: 0,
-        processing: 0,
-        completed: 0,
-        needsReview: 0
+        throw new Error('File required')
       }
     }
   }

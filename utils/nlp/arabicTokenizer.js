@@ -31,6 +31,7 @@ export function tokenize(text) {
 
 // تقسيم النص إلى جمل
 export function sentenceSplit(text) {
+  if (text == null || typeof text !== 'string') return [];
   return text
     .split(/[.!؟?।\n]+/)
     .map(s => s.trim())
@@ -39,6 +40,7 @@ export function sentenceSplit(text) {
 
 // تقسيم النص إلى فقرات
 export function paragraphSplit(text) {
+  if (text == null || typeof text !== 'string') return [];
   return text
     .split(/\n\n+/)
     .map(p => p.trim())

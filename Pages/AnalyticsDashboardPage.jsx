@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-import { supabase } from '@/api/supabaseClient';
+import { manuscriptsApi } from '@/api/backendClient';
 
 const AnalyticsDashboardPage = () => {
   const [analytics, setAnalytics] = useState({
@@ -33,13 +33,7 @@ const AnalyticsDashboardPage = () => {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('manuscripts')
-        .select('id,title,word_count,genre,status,created_at');
-
-      if (error) throw error;
-
-      const manuscripts = data || [];
+      const manuscripts = await manuscriptsApi.list() || [];
 
       // Overview
       const totalManuscripts = manuscripts.length;

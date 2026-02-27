@@ -1,53 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Playfair+Display:wght@500;700&family=Cairo:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Cairo:wght@400;600&family=Orbitron:wght@400;600;700&family=Rajdhani:wght@400;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Vintage Arabic palette */
-    --background: 37 43% 94%;
-    --foreground: 25 28% 18%;
-    --card: 38 35% 92%;
-    --card-foreground: 25 28% 18%;
-    --popover: 38 35% 92%;
-    --popover-foreground: 25 28% 18%;
-    --primary: 20 48% 38%;
-    --primary-foreground: 44 60% 95%;
-    --secondary: 43 38% 52%;
-    --secondary-foreground: 25 28% 18%;
-    --muted: 38 25% 85%;
-    --muted-foreground: 24 18% 38%;
-    --accent: 172 22% 36%;
-    --accent-foreground: 44 60% 95%;
-    --destructive: 5 55% 44%;
-    --destructive-foreground: 44 60% 95%;
-    --border: 35 30% 80%;
-    --input: 35 30% 80%;
-    --ring: 20 48% 38%;
+    /* NEXUS Cyberpunk Dark Theme */
+    --background: 240 15% 6%;
+    --foreground: 220 20% 90%;
+    --card: 240 15% 9%;
+    --card-foreground: 220 20% 90%;
+    --popover: 240 15% 9%;
+    --popover-foreground: 220 20% 90%;
+    --primary: 270 60% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 320 60% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 10% 16%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 270 40% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
+    --ring: 270 60% 60%;
     --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 24 22% 14%;
-    --foreground: 44 40% 92%;
-    --card: 24 22% 16%;
-    --card-foreground: 44 40% 92%;
-    --popover: 24 22% 16%;
-    --popover-foreground: 44 40% 92%;
-    --primary: 20 48% 58%;
-    --primary-foreground: 24 22% 10%;
-    --secondary: 43 28% 46%;
-    --secondary-foreground: 44 40% 92%;
-    --muted: 26 16% 28%;
-    --muted-foreground: 35 20% 68%;
-    --accent: 172 22% 46%;
-    --accent-foreground: 24 22% 12%;
-    --destructive: 5 55% 48%;
-    --destructive-foreground: 44 40% 92%;
-    --border: 26 18% 32%;
-    --input: 26 18% 32%;
-    --ring: 20 48% 58%;
+    --success: 155 70% 45%;
+    --warning: 40 90% 55%;
   }
 }
 
@@ -58,6 +38,15 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: 'Noto Naskh Arabic', 'Cairo', 'Playfair Display', system-ui, sans-serif;
+    font-family: 'Noto Naskh Arabic', 'Cairo', system-ui, sans-serif;
   }
 }
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(240 15% 8%); }
+::-webkit-scrollbar-thumb { background: hsl(270 60% 40%); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(270 60% 55%); }
+
+/* Selection color */
+::selection { background: hsl(270 60% 40% / 0.4); color: white; }

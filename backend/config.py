@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     # File Storage
     STORAGE_PATH: str = "/var/www/shadow7/storage"
     EXPORTS_PATH: str = "/var/www/shadow7/exports"
+    MANUSCRIPTS_PATH: str = "/var/www/shadow7/storage/manuscripts"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_MANUSCRIPT_UPLOAD: int = 100 * 1024 * 1024  # 100MB for 100k-word docs + ZIP
+    MAX_MULTIPART_PART_SIZE: int = 100 * 1024 * 1024  # 100MB — overrides Starlette 1MB default
     
     # Limits
     MIN_WORDS: int = 500

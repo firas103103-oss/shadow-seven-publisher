@@ -309,5 +309,10 @@ class N8NCallbackPayload(BaseModel):
     status: str  # "completed" or "failed"
     outline_id: Optional[str] = None
     error_message: Optional[str] = None
+    error: Optional[str] = None  # n8n workflow sends "error"
     zip_file_path: Optional[str] = None
     zip_file_url: Optional[str] = None
+
+    def get_error(self) -> Optional[str]:
+        """Return error_message or error (workflow sends either)"""
+        return self.error_message or self.error

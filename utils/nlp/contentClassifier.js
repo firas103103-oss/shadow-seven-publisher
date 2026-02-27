@@ -111,7 +111,8 @@ function extractFeatures(text) {
 
 // تصنيف فقرات متعددة
 export function classifyParagraphs(text) {
-  const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 50);
+  if (text == null || typeof text !== 'string') return [];
+  const paragraphs = text.split(/\n\n+/).filter(p => p && p.trim().length > 50);
   
   return paragraphs.map((para, index) => ({
     index,

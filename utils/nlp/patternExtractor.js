@@ -49,6 +49,7 @@ export const ARABIC_NUMBERS = {
 
 // استخراج أرقام الفصول
 export function extractChapters(text) {
+  if (text == null || typeof text !== 'string') return [];
   const chapters = [];
   
   ARABIC_PATTERNS.chapter.forEach(pattern => {
@@ -74,6 +75,7 @@ export function extractChapters(text) {
 
 // استخراج أرقام الصفحات
 export function extractPageNumbers(text) {
+  if (text == null || typeof text !== 'string') return [];
   const pages = [];
   
   ARABIC_PATTERNS.page.forEach(pattern => {
@@ -100,6 +102,7 @@ export function extractPageNumbers(text) {
 
 // استخراج الفهرس
 export function extractTableOfContents(text) {
+  if (text == null || typeof text !== 'string') return null;
   const tocMatch = text.match(ARABIC_PATTERNS.toc);
   
   if (!tocMatch) return null;
@@ -133,6 +136,7 @@ export function extractTableOfContents(text) {
 
 // استخراج بنية الوثيقة
 export function extractDocumentStructure(text) {
+  if (text == null || typeof text !== 'string') return { headers: [], paragraphs: [], lists: [], quotes: [], codeBlocks: [] };
   const lines = text.split('\n');
   const structure = {
     headers: [],
@@ -160,7 +164,8 @@ export function extractDocumentStructure(text) {
     
     // Headers
     if (/^#+\s/.test(trimmed)) {
-      const level = trimmed.match(/^#+/)[0].length;
+      const m = trimmed.match(/^#+/);
+      const level = m ? m[0].length : 0;
       structure.headers.push({
         line: index,
         text: trimmed.replace(/^#+\s*/, ''),
@@ -226,8 +231,9 @@ function parseArabicNumber(text) {
 }
 
 function getIndentLevel(line) {
-  const spaces = line.match(/^\s*/)[0].length;
-  return Math.floor(spaces / 2);
+  if (line == null) return 0;
+  const m = line.match(/^\s*/);
+  return Math.floor((m ? m[0] : '').length / 2);
 }
 
 export default {

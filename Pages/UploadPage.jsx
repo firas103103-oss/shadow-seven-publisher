@@ -10,9 +10,11 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
+import mammoth from 'mammoth';
 import { useToast } from '../Components/ToastProvider';
 import { analyzeAndCleanText } from '@/Components/upload/TextAnalyzerEnhanced';
-import { supabase } from '../api/supabaseClient';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const UploadPage = () => {
   const [files, setFiles] = useState([]);
@@ -23,14 +25,14 @@ const UploadPage = () => {
   const fileInputRef = useRef(null);
   const { success, error } = useToast();
 
-  // التحقق من نوع الملف
+  // التحقق من نوع الملف (مطابق للتوثيق: TXT, DOCX)
   const validateFile = (file) => {
-    const validTypes = ['text/plain'];
-    const validExtensions = ['.txt'];
+    const validTypes = ['text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const validExtensions = ['.txt', '.docx'];
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
-      error('الآن ندعم ملفات TXT فقط. حوّل الملف إلى TXT ثم أعد الرفع.');
+      error('ندعم ملفات TXT و DOCX فقط. حوّل الملف ثم أعد الرفع.');
       return false;
     }
 
@@ -44,20 +46,18 @@ const UploadPage = () => {
     return true;
   };
 
-  // قراءة محتوى الملف
+  // قراءة محتوى الملف (TXT أو DOCX — مطابق للتوثيق)
   const readFileContent = async (file) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'docx') {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value || '';
+    }
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        resolve(e.target.result);
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('فشل قراءة الملف'));
-      };
-
-      // قراءة النص (TXT فقط)
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('فشل قراءة الملف'));
       reader.readAsText(file, 'UTF-8');
     });
   };
@@ -101,11 +101,11 @@ const UploadPage = () => {
 
       // قراءة المحتوى
       const content = await readFileContent(fileObj.file);
-      
+
       updateFileStatus(fileObj.id, 'analyzing', 30);
 
       // تخزين المحتوى
-      setFiles(prev => prev.map(f => 
+      setFiles(prev => prev.map(f =>
         f.id === fileObj.id ? { ...f, content } : f
       ));
 
@@ -114,18 +114,18 @@ const UploadPage = () => {
 
       // بدء التحليل مباشرة باستخدام الدالة بدلاً من مكون غير موجود
       const logger = {
-        start: () => {},
+        start: () => { },
         progress: (info) => {
           // تقدير تقدّم بسيط بين 50% و 90%
           const next = Math.min(90, 50 + Math.floor((info?.completed || 0) / (info?.total || 1) * 40));
           updateFileStatus(fileObj.id, 'analyzing', next);
         },
-        complete: () => {},
-        warn: () => {}
+        complete: () => { },
+        warn: () => { }
       };
 
       const analysis = await analyzeAndCleanText(content, 'ar', logger);
-      await handleAnalysisComplete(analysis);
+      await handleAnalysisComplete(analysis, { ...fileObj, content });
 
     } catch (err) {
       console.error('Error processing file:', err);
@@ -143,80 +143,67 @@ const UploadPage = () => {
     ));
   };
 
-  // رفع إلى Supabase
-  const uploadToSupabase = async (fileObj, analysisResults) => {
+  // رفع إلى Backend المحلي (يستبدل Supabase Storage)
+  const uploadToBackend = async (fileObj, analysisResults) => {
     try {
       updateFileStatus(fileObj.id, 'analyzing', 80);
 
-      // 1. رفع الملف إلى Storage
-      const fileName = `${Date.now()}-${fileObj.file.name}`;
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('manuscripts')
-        .upload(fileName, fileObj.file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const formData = new FormData();
+      formData.append('file', fileObj.file);
+      formData.append('title', fileObj.name.replace(/\.(txt|docx|pdf)$/i, ''));
+      formData.append('content', fileObj.content || '');
+      formData.append('word_count', String(analysisResults.wordCount || 0));
+      formData.append('metadata', JSON.stringify({
+        chapters: analysisResults.chapters || [],
+        content_type: analysisResults.contentType,
+        language: analysisResults.language,
+        analysis: analysisResults
+      }));
 
-      if (storageError) throw storageError;
+      const base = (API_BASE || '').replace(/\/$/, '');
+      const url = base ? `${base}/api/shadow7/manuscripts/upload` : '/api/shadow7/manuscripts/upload';
+      const res = await fetch(url, {
+        method: 'POST',
+        body: formData
+      });
 
-      updateFileStatus(fileObj.id, 'analyzing', 90);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || res.statusText || 'فشل الرفع');
+      }
 
-      // 2. الحصول على المستخدم الحالي
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // 3. حفظ البيانات في Database
-      const { data: manuscript, error: dbError } = await supabase
-        .from('manuscripts')
-        .insert({
-          title: fileObj.name.replace(/\.(txt|docx|pdf)$/i, ''),
-          content: fileObj.content,
-          file_path: storageData.path,
-          word_count: analysisResults.wordCount || 0,
-          status: 'draft',
-          user_id: user?.id,
-          metadata: {
-            chapters: analysisResults.chapters || [],
-            content_type: analysisResults.contentType,
-            language: analysisResults.language,
-            analysis: analysisResults
-          }
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
+      const manuscript = await res.json();
       updateFileStatus(fileObj.id, 'completed', 100);
       success('تم رفع المخطوطة بنجاح إلى قاعدة البيانات! 🎉');
-      
       return manuscript;
     } catch (err) {
-      console.error('Upload to Supabase error:', err);
+      console.error('Upload error:', err);
       error(`فشل الرفع: ${err.message}`);
       throw err;
     }
   };
 
   // معالجة نتائج التحليل
-  const handleAnalysisComplete = async (results) => {
-    if (currentFile) {
+  const handleAnalysisComplete = async (results, fileWithContent) => {
+    const fileObj = fileWithContent || currentFile;
+    if (fileObj) {
       setFiles(prev => prev.map(f =>
-        f.id === currentFile.id 
+        f.id === fileObj.id
           ? { ...f, status: 'completed', progress: 100, analysis: results }
           : f
       ));
-      
+
       setAnalysisResults(results);
       success('✅ تم التحليل بنجاح! يمكنك الآن الانتقال للخطوة التالية.');
-      
-      // Upload to Supabase (enabled - tables exist)
+
+      // Upload to local backend (replaces Supabase Storage)
       try {
-        await uploadToSupabase(currentFile, results);
+        await uploadToBackend(fileObj, results);
       } catch (uploadErr) {
-        console.warn('Supabase upload skipped:', uploadErr.message);
+        console.warn('Upload skipped:', uploadErr.message);
       }
     }
-    
+
     setAnalyzing(false);
     setCurrentFile(null);
   };
@@ -298,8 +285,8 @@ const UploadPage = () => {
           className={`
             cyber-card relative rounded-lg border-2 border-dashed p-12 text-center
             transition-all duration-300 cursor-pointer
-            ${isDragging 
-              ? 'border-shadow-accent bg-shadow-accent/10 scale-105' 
+            ${isDragging
+              ? 'border-shadow-accent bg-shadow-accent/10 scale-105'
               : 'border-shadow-primary/30 hover:border-shadow-accent/50'}
           `}
           onDragEnter={handleDragEnter}
@@ -312,7 +299,7 @@ const UploadPage = () => {
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".txt,text/plain"
+            accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileInputChange}
             className="hidden"
           />
@@ -381,7 +368,7 @@ const UploadPage = () => {
               <Sparkles className="w-6 h-6 text-shadow-accent" />
               نتائج التحليل
             </h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="عدد الكلمات" value={analysisResults.wordCount?.toLocaleString() || '0'} />
               <StatCard label="الفصول" value={analysisResults.chapters?.length || '0'} />
@@ -466,7 +453,7 @@ const FileCard = ({ fileObj, onRemove, onAnalyze, isProcessing }) => {
               تحليل
             </button>
           )}
-          
+
           <button
             onClick={onRemove}
             className="p-2 rounded hover:bg-red-500/10 text-red-500 transition-colors"

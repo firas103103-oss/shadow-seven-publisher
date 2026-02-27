@@ -5,6 +5,7 @@ Uses asyncpg for async PostgreSQL operations
 """
 
 import asyncpg
+import json
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 from config import settings
@@ -340,6 +341,114 @@ class DatabaseService:
             """, request_id)
             return result == "UPDATE 1"
     
+    # ─────────────────────────────────────────────────────────
+    # MANUSCRIPTS (PostgreSQL + تخزين محلي)
+    # ─────────────────────────────────────────────────────────
+
+    @staticmethod
+    async def ensure_manuscripts_table(conn) -> None:
+        """Create manuscripts table if not exists (local-only schema, no auth.users FK)"""
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.manuscripts (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                title TEXT NOT NULL,
+                author TEXT,
+                content TEXT,
+                chapters JSONB,
+                word_count INTEGER,
+                status TEXT DEFAULT 'draft',
+                file_path TEXT,
+                cover_url TEXT,
+                metadata JSONB,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                user_id UUID
+            )
+        """)
+        # Migration: add metadata if table existed before
+        await conn.execute("""
+            ALTER TABLE public.manuscripts ADD COLUMN IF NOT EXISTS metadata JSONB
+        """)
+
+    @staticmethod
+    async def create_manuscript(data: dict) -> dict:
+        """Create manuscript record (local upload flow)"""
+        async with get_connection() as conn:
+            await DatabaseService.ensure_manuscripts_table(conn)
+            row = await conn.fetchrow("""
+                INSERT INTO public.manuscripts (
+                    title, author, content, chapters, word_count,
+                    status, file_path, metadata, user_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *
+            """,
+                data.get('title', 'Untitled'),
+                data.get('author'),
+                data.get('content'),
+                json.dumps(data.get('chapters', [])) if data.get('chapters') else None,
+                data.get('word_count', 0),
+                data.get('status', 'draft'),
+                data.get('file_path'),
+                json.dumps(data.get('metadata', {})) if data.get('metadata') else None,
+                data.get('user_id')
+            )
+            return dict(row)
+
+    @staticmethod
+    async def list_manuscripts(order_by: str = '-created_at', limit: int = 100) -> list:
+        """List manuscripts (PostgreSQL)"""
+        async with get_connection() as conn:
+            await DatabaseService.ensure_manuscripts_table(conn)
+            col = 'created_at' if not order_by else (order_by.lstrip('-') or 'created_at')
+            desc = order_by.startswith('-') if order_by else True
+            safe_cols = {'created_at', 'updated_at', 'title', 'word_count'}
+            col = col if col in safe_cols else 'created_at'
+            order = 'DESC' if desc else 'ASC'
+            rows = await conn.fetch(
+                f'SELECT * FROM public.manuscripts ORDER BY "{col}" {order} LIMIT $1',
+                limit
+            )
+            return [dict(r) for r in rows]
+
+    @staticmethod
+    async def get_manuscript(id: str) -> Optional[dict]:
+        """Get single manuscript by id"""
+        async with get_connection() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM public.manuscripts WHERE id = $1",
+                id
+            )
+            return dict(row) if row else None
+
+    @staticmethod
+    async def update_manuscript(id: str, data: dict) -> Optional[dict]:
+        """Update manuscript"""
+        async with get_connection() as conn:
+            updates = []
+            vals = []
+            idx = 1
+            for k, v in data.items():
+                if k in ('title', 'author', 'content', 'chapters', 'word_count', 'status', 'file_path', 'metadata'):
+                    updates.append(f'"{k}" = ${idx}')
+                    vals.append(json.dumps(v) if k in ('chapters', 'metadata') and v is not None else v)
+                    idx += 1
+            if not updates:
+                return await DatabaseService.get_manuscript(id)
+            updates.append('"updated_at" = NOW()')
+            vals.append(id)
+            row = await conn.fetchrow(
+                f"UPDATE public.manuscripts SET {', '.join(updates)} WHERE id = ${idx} RETURNING *",
+                *vals
+            )
+            return dict(row) if row else None
+
+    @staticmethod
+    async def delete_manuscript(id: str) -> bool:
+        """Delete manuscript"""
+        async with get_connection() as conn:
+            await conn.execute("DELETE FROM public.manuscripts WHERE id = $1", id)
+            return True
+
     # ─────────────────────────────────────────────────────────
     # LOGS
     # ─────────────────────────────────────────────────────────

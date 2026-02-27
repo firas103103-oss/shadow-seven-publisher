@@ -14,17 +14,19 @@ import secrets
 import re
 import os
 import json
+import uuid
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
 from config import settings
-from db import init_db, close_db, db
+from db import init_db, close_db, db, get_connection
 from models import (
     SubmitRequestInput, SubmitResponse, TrackingResponse,
     ErrorResponse, FileUploadInput, N8NCallbackPayload,
     RequestStatus
 )
+from email_service import init_email_service, get_email_service
 
 # Logging setup
 logging.basicConfig(
@@ -45,9 +47,19 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting SHADOW-7 Publisher API...")
     await init_db()
     
+    # Initialize email service with DB pool
+    try:
+        pool = await db.get_pool()
+        init_email_service(pool)
+    except Exception as e:
+        logger.warning(f"Email service init without DB: {e}")
+        init_email_service(None)
+    
     # Create storage directories
     os.makedirs(settings.STORAGE_PATH, exist_ok=True)
     os.makedirs(settings.EXPORTS_PATH, exist_ok=True)
+    manuscripts_dir = getattr(settings, 'MANUSCRIPTS_PATH', None) or os.path.join(settings.STORAGE_PATH, 'manuscripts')
+    os.makedirs(manuscripts_dir, exist_ok=True)
     
     logger.info(f"✅ SHADOW-7 API ready on port {settings.PORT}")
     
@@ -128,6 +140,7 @@ async def trigger_n8n_workflow(tracking_id: str, request_data: dict):
     """Trigger n8n webhook to start generation pipeline"""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
+            # n8n workflow expects top-level: target_audience, book_genre, tone, platform, language
             payload = {
                 "tracking_id": tracking_id,
                 "request_id": str(request_data['id']),
@@ -135,6 +148,11 @@ async def trigger_n8n_workflow(tracking_id: str, request_data: dict):
                 "user_name": request_data.get('user_name'),
                 "raw_text": request_data['raw_text'],
                 "word_count": request_data['word_count_in'],
+                "target_audience": request_data.get('target_audience', 'عام'),
+                "book_genre": request_data.get('book_genre', 'آخر'),
+                "tone": request_data.get('tone_of_voice', 'رسمي'),
+                "platform": request_data.get('platform', 'kindle'),
+                "language": request_data.get('language', 'ar'),
                 "preferences": {
                     "target_audience": request_data.get('target_audience', 'عام'),
                     "book_genre": request_data.get('book_genre', 'آخر'),
@@ -142,7 +160,7 @@ async def trigger_n8n_workflow(tracking_id: str, request_data: dict):
                     "platform": request_data.get('platform', 'kindle'),
                     "language": request_data.get('language', 'ar')
                 },
-                "callback_url": f"http://localhost:{settings.PORT}/api/shadow7/callback"
+                "callback_url": "http://shadow7_api:8002/api/shadow7/callback"
             }
             
             response = await client.post(
@@ -163,18 +181,152 @@ async def trigger_n8n_workflow(tracking_id: str, request_data: dict):
 
 
 # ─────────────────────────────────────────────────────────────
+# AUTH ROUTES (PostgreSQL — بديل PostgREST/Supabase)
+# ─────────────────────────────────────────────────────────────
+
+from pydantic import BaseModel as PydanticBase
+
+class AuthLoginInput(PydanticBase):
+    email: str
+    password: str
+
+class AuthRegisterInput(PydanticBase):
+    email: str
+    password: str
+    full_name: Optional[str] = "user"
+
+class AuthValidateInput(PydanticBase):
+    token: str
+
+class AuthLogoutInput(PydanticBase):
+    token: str
+
+class AuthUpdateProfileInput(PydanticBase):
+    token: str
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+@app.post("/api/shadow7/auth/login")
+async def auth_login(data: AuthLoginInput):
+    """تسجيل الدخول — يستدعي دالة login في PostgreSQL"""
+    try:
+        async with get_connection() as conn:
+            result = await conn.fetchval("SELECT login($1, $2)", data.email, data.password)
+            if isinstance(result, dict):
+                out = result
+            else:
+                import json
+                out = json.loads(result) if isinstance(result, str) else result
+            if out.get("error"):
+                raise HTTPException(status_code=401, detail=out.get("error", "Invalid credentials"))
+            return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth login error: {e}")
+        raise HTTPException(status_code=500, detail="فشل تسجيل الدخول")
+
+@app.post("/api/shadow7/auth/register")
+async def auth_register(data: AuthRegisterInput):
+    """التسجيل — يستدعي دالة register في PostgreSQL"""
+    try:
+        async with get_connection() as conn:
+            result = await conn.fetchval(
+                "SELECT register($1, $2, $3)",
+                data.email, data.password, data.full_name or "user"
+            )
+            if isinstance(result, dict):
+                out = result
+            else:
+                import json
+                out = json.loads(result) if isinstance(result, str) else result
+            if out.get("error"):
+                raise HTTPException(status_code=400, detail=out.get("error", "Registration failed"))
+            return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth register error: {e}")
+        raise HTTPException(status_code=500, detail="فشل التسجيل")
+
+@app.post("/api/shadow7/auth/validate")
+async def auth_validate(data: AuthValidateInput):
+    """التحقق من الجلسة"""
+    try:
+        async with get_connection() as conn:
+            result = await conn.fetchval("SELECT validate_session($1)", data.token)
+            if isinstance(result, dict):
+                out = result
+            else:
+                import json
+                out = json.loads(result) if isinstance(result, str) else result
+            return out
+    except Exception as e:
+        logger.error(f"Auth validate error: {e}")
+        return {"valid": False, "error": str(e)}
+
+@app.post("/api/shadow7/auth/logout")
+async def auth_logout(data: AuthLogoutInput):
+    """تسجيل الخروج"""
+    try:
+        async with get_connection() as conn:
+            await conn.fetchval("SELECT logout($1)", data.token)
+        return {"success": True}
+    except Exception:
+        return {"success": True}
+
+@app.post("/api/shadow7/auth/update-profile")
+async def auth_update_profile(data: AuthUpdateProfileInput):
+    """تحديث الملف الشخصي"""
+    try:
+        async with get_connection() as conn:
+            result = await conn.fetchval(
+                "SELECT update_profile($1, $2, $3)",
+                data.token, data.full_name, data.avatar_url
+            )
+            if isinstance(result, dict):
+                out = result
+            else:
+                import json
+                out = json.loads(result) if isinstance(result, str) else result
+            if out.get("error"):
+                raise HTTPException(status_code=401, detail=out.get("error"))
+            return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auth update profile error: {e}")
+        raise HTTPException(status_code=500, detail="فشل التحديث")
+
+
+# ─────────────────────────────────────────────────────────────
 # ROUTES: /api/shadow7/
 # ─────────────────────────────────────────────────────────────
 
 @app.get("/api/shadow7/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
+    """Health check endpoint — verifies Postgres connection and manuscripts table"""
+    result = {
         "status": "healthy",
         "service": "SHADOW-7 Publisher",
         "version": settings.APP_VERSION,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "postgres": "unknown",
+        "manuscripts_table": False,
     }
+    try:
+        async with get_connection() as conn:
+            row = await conn.fetchrow(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'manuscripts')"
+            )
+            result["postgres"] = "connected"
+            result["manuscripts_table"] = bool(row and row["exists"])
+        if not result["manuscripts_table"]:
+            result["status"] = "degraded"
+    except Exception as e:
+        result["status"] = "unhealthy"
+        result["postgres"] = str(e)
+    return result
 
 
 @app.post(
@@ -342,6 +494,197 @@ async def upload_file(
         raise HTTPException(status_code=500, detail="خطأ في معالجة الملف")
 
 
+async def _read_file_robust(upload_file, max_size: int) -> bytes:
+    """
+    Read upload file with chunked reading for stability.
+    Handles incomplete reads and EOF gracefully — loops until empty chunk.
+    """
+    import io
+    content = io.BytesIO()
+    total_read = 0
+    chunk_size = 1024 * 1024  # 1MB chunks
+
+    while True:
+        chunk = await upload_file.read(chunk_size)
+        if not chunk:
+            break
+        content.write(chunk)
+        total_read += len(chunk)
+        if total_read > max_size:
+            raise HTTPException(400, f"حجم الملف كبير جداً. الحد الأقصى: {max_size // (1024*1024)}MB")
+    return content.getvalue()
+
+
+@app.post("/api/shadow7/manuscripts/upload")
+async def upload_manuscript(request: Request):
+    """
+    رفع مخطوطة محلي — PostgreSQL + تخزين ملفات.
+    Saves file to disk and inserts into manuscripts table.
+    Uses request.form(max_part_size=100MB) to avoid Starlette 1MB default.
+    Robust read with retry and EOF handling for large files (100k-word docs).
+    """
+    try:
+        max_part = getattr(settings, 'MAX_MULTIPART_PART_SIZE', 100 * 1024 * 1024)
+        async with request.form(max_part_size=max_part) as form:
+            file = form.get("file")
+            if not file or not hasattr(file, 'read'):
+                raise HTTPException(400, "الملف مطلوب")
+
+            title = form.get("title") or "Untitled"
+            content = form.get("content") or ""
+            word_count = int(form.get("word_count") or 0)
+            metadata_str = form.get("metadata")
+            user_id = form.get("user_id")
+
+            # Validate file type
+            allowed = ['.txt', '.docx', '.pdf']
+            filename = file.filename or "file"
+            ext = os.path.splitext(filename)[-1].lower()
+            if ext not in allowed:
+                raise HTTPException(400, f"نوع الملف غير مدعوم. المسموح: {', '.join(allowed)}")
+
+            max_size = getattr(settings, 'MAX_MANUSCRIPT_UPLOAD', 100 * 1024 * 1024)
+            content_bytes = await _read_file_robust(file, max_size)
+            if len(content_bytes) > max_size:
+                raise HTTPException(400, f"حجم الملف كبير جداً. الحد الأقصى: {max_size // (1024*1024)}MB")
+
+            # Save file locally
+            manuscripts_dir = getattr(settings, 'MANUSCRIPTS_PATH', None) or os.path.join(settings.STORAGE_PATH, 'manuscripts')
+            os.makedirs(manuscripts_dir, exist_ok=True)
+            safe_name = re.sub(r'[^\w\-\.]', '_', filename)
+            file_path = os.path.join(manuscripts_dir, f"{int(datetime.utcnow().timestamp())}-{safe_name}")
+            with open(file_path, 'wb') as f:
+                f.write(content_bytes)
+            relative_path = f"manuscripts/{os.path.basename(file_path)}"
+
+            # Parse metadata
+            meta = {}
+            if metadata_str:
+                try:
+                    meta = json.loads(metadata_str)
+                except json.JSONDecodeError:
+                    pass
+
+            # Insert into DB
+            manuscript_data = {
+                'title': title,
+                'content': content,
+                'word_count': word_count,
+                'file_path': relative_path,
+                'metadata': meta,
+                'user_id': uuid.UUID(user_id) if user_id else None,
+                'chapters': meta.get('chapters') if isinstance(meta.get('chapters'), list) else None
+            }
+
+            created = await db.create_manuscript(manuscript_data)
+            logger.info(f"Manuscript uploaded locally: {created['id']} ({len(content_bytes)} bytes)")
+
+            return {
+                "id": str(created['id']),
+                "title": created['title'],
+                "file_path": created['file_path'],
+                "word_count": created['word_count'],
+                "status": created['status']
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Manuscript upload error: {e}")
+        raise HTTPException(500, "فشل رفع المخطوطة")
+
+
+@app.post("/api/shadow7/manuscripts")
+async def create_manuscript_json(request: Request):
+    """Create manuscript from JSON (no file) — for editor/metadata-only flow"""
+    try:
+        data = await request.json()
+        manuscript_data = {
+            'title': data.get('title', 'Untitled'),
+            'author': data.get('author'),
+            'content': data.get('content', ''),
+            'chapters': data.get('chapters'),
+            'word_count': data.get('word_count', 0),
+            'metadata': data.get('metadata', {}),
+            'user_id': None
+        }
+        created = await db.create_manuscript(manuscript_data)
+        return {
+            "id": str(created['id']),
+            "title": created['title'],
+            "word_count": created['word_count'],
+            "status": created.get('status', 'draft')
+        }
+    except Exception as e:
+        logger.error(f"Create manuscript error: {e}")
+        raise HTTPException(500, "فشل إنشاء المخطوطة")
+
+
+@app.get("/api/shadow7/manuscripts")
+async def list_manuscripts(order_by: str = "-created_at", limit: int = 100):
+    """List manuscripts (PostgreSQL)"""
+    try:
+        rows = await db.list_manuscripts(order_by=order_by, limit=limit)
+        return [{"id": str(r["id"]), "title": r["title"], "author": r.get("author"),
+                 "content": r.get("content"), "chapters": r.get("chapters"),
+                 "word_count": r.get("word_count"), "status": r.get("status", "draft"),
+                 "genre": r.get("genre"), "file_path": r.get("file_path"),
+                 "metadata": r.get("metadata"),
+                 "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                 "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None}
+                for r in rows]
+    except Exception as e:
+        logger.error(f"List manuscripts error: {e}")
+        raise HTTPException(500, "فشل جلب المخطوطات")
+
+
+@app.get("/api/shadow7/manuscripts/{manuscript_id}")
+async def get_manuscript(manuscript_id: str):
+    """Get single manuscript by id"""
+    try:
+        row = await db.get_manuscript(manuscript_id)
+        if not row:
+            raise HTTPException(404, "المخطوطة غير موجودة")
+        return {"id": str(row["id"]), "title": row["title"], "author": row.get("author"),
+                "content": row.get("content"), "chapters": row.get("chapters"),
+                "word_count": row.get("word_count"), "status": row.get("status", "draft"),
+                "genre": row.get("genre"), "file_path": row.get("file_path"),
+                "metadata": row.get("metadata"),
+                "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+                "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get manuscript error: {e}")
+        raise HTTPException(500, "فشل جلب المخطوطة")
+
+
+@app.patch("/api/shadow7/manuscripts/{manuscript_id}")
+async def update_manuscript(manuscript_id: str, request: Request):
+    """Update manuscript"""
+    try:
+        data = await request.json()
+        row = await db.update_manuscript(manuscript_id, data)
+        if not row:
+            raise HTTPException(404, "المخطوطة غير موجودة")
+        return {"id": str(row["id"]), "title": row["title"], "status": row.get("status")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update manuscript error: {e}")
+        raise HTTPException(500, "فشل تحديث المخطوطة")
+
+
+@app.delete("/api/shadow7/manuscripts/{manuscript_id}")
+async def delete_manuscript(manuscript_id: str):
+    """Delete manuscript"""
+    try:
+        await db.delete_manuscript(manuscript_id)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Delete manuscript error: {e}")
+        raise HTTPException(500, "فشل حذف المخطوطة")
+
+
 @app.get(
     "/api/shadow7/track/{tracking_id}",
     response_model=TrackingResponse,
@@ -409,12 +752,13 @@ async def n8n_callback(data: N8NCallbackPayload):
             logger.info(f"✅ Completed: {data.tracking_id}")
             
         elif data.status == "failed":
+            err = (data.get_error() or data.error_message or getattr(data, 'error', None)) or 'Unknown'
             await db.update_request_status(
                 data.tracking_id,
                 "failed",
-                error_message=data.error_message
+                error_message=err
             )
-            logger.error(f"❌ Failed: {data.tracking_id} - {data.error_message}")
+            logger.error(f"❌ Failed: {data.tracking_id} - {err}")
         
         return {"received": True}
         
@@ -487,21 +831,21 @@ async def save_outline(data: dict):
         
         request_id = str(request_data['id'])
         
-        # Save outline to DB
+        # Save outline to DB (schema: book_title, book_summary, chapters, chapter_count)
         async with (await db.get_pool()).acquire() as conn:
             await conn.execute("""
+                DELETE FROM shadow7_outlines WHERE request_id = $1
+            """, request_id)
+            await conn.execute("""
                 INSERT INTO shadow7_outlines 
-                (request_id, book_title, book_subtitle, chapters, total_chapters)
+                (request_id, book_title, book_summary, chapters, chapter_count)
                 VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (request_id) DO UPDATE SET
-                    book_title = EXCLUDED.book_title,
-                    chapters = EXCLUDED.chapters
             """, 
                 request_id,
                 outline.get('book_title', 'Untitled'),
-                outline.get('subtitle'),
+                outline.get('subtitle') or outline.get('book_summary'),
                 json.dumps(outline.get('chapters', [])),
-                outline.get('total_chapters', 0)
+                outline.get('total_chapters') or outline.get('chapter_count', 0)
             )
         
         # Update request status
@@ -538,20 +882,16 @@ async def save_chapter(data: dict):
         
         request_id = str(request_data['id'])
         
-        # Save chapter
+        # Save chapter (schema: chapter_title — n8n قد يرسل title أو chapter_title)
         async with (await db.get_pool()).acquire() as conn:
             await conn.execute("""
                 INSERT INTO shadow7_chapters 
-                (request_id, chapter_number, title, content, word_count, ending_summary)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (request_id, chapter_number) DO UPDATE SET
-                    content = EXCLUDED.content,
-                    word_count = EXCLUDED.word_count,
-                    ending_summary = EXCLUDED.ending_summary
+                (request_id, chapter_number, chapter_title, content, word_count, ending_summary, status)
+                VALUES ($1, $2, $3, $4, $5, $6, 'completed')
             """,
                 request_id,
                 data.get('chapter_number'),
-                data.get('title'),
+                data.get('chapter_title') or data.get('title', 'Chapter'),
                 data.get('content'),
                 data.get('word_count', 0),
                 data.get('ending_summary')
@@ -610,22 +950,23 @@ async def save_reports(data: dict):
         
         request_id = str(request_data['id'])
         
-        # Save each report
+        # Save each report (no unique on request_id+report_type, so delete+insert)
         async with (await db.get_pool()).acquire() as conn:
+            await conn.execute(
+                "DELETE FROM shadow7_reports WHERE request_id = $1",
+                request_id
+            )
             for report_type, report_data in reports.items():
                 await conn.execute("""
                     INSERT INTO shadow7_reports 
                     (request_id, report_type, title, content, scores)
                     VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (request_id, report_type) DO UPDATE SET
-                        content = EXCLUDED.content,
-                        scores = EXCLUDED.scores
                 """,
                     request_id,
                     report_type,
                     report_data.get('title', report_type),
-                    json.dumps(report_data),
-                    json.dumps({"score": report_data.get('score', 0)})
+                    json.dumps(report_data) if isinstance(report_data, dict) else json.dumps({"raw": str(report_data)}),
+                    json.dumps({"score": report_data.get('score', 0)}) if isinstance(report_data, dict) else '{}'
                 )
         
         # Update progress
@@ -665,8 +1006,10 @@ async def create_package(data: dict):
         
         request_id = str(request_data['id'])
         
-        # Create package directory
-        package_dir = f"/var/www/shadow7/packages/{tracking_id}"
+        # Create package directory (ensure parent exists)
+        packages_base = "/var/www/shadow7/packages"
+        os.makedirs(packages_base, exist_ok=True)
+        package_dir = f"{packages_base}/{tracking_id}"
         os.makedirs(package_dir, exist_ok=True)
         
         # Get outline
@@ -692,16 +1035,17 @@ async def create_package(data: dict):
         manuscript_path = f"{package_dir}/manuscript.txt"
         with open(manuscript_path, 'w', encoding='utf-8') as f:
             f.write(f"# {book_title}\n\n")
-            if outline and outline['book_subtitle']:
-                f.write(f"## {outline['book_subtitle']}\n\n")
+            if outline and (outline.get('book_summary') or outline.get('book_subtitle')):
+                f.write(f"## {outline.get('book_summary') or outline.get('book_subtitle')}\n\n")
             f.write("---\n\n")
             
             total_words = 0
             for chapter in chapters:
-                f.write(f"\n\n## الفصل {chapter['chapter_number']}: {chapter['title']}\n\n")
-                f.write(chapter['content'] or '')
+                ch_title = chapter.get('chapter_title') or chapter.get('title', 'Chapter')
+                f.write(f"\n\n## الفصل {chapter['chapter_number']}: {ch_title}\n\n")
+                f.write(chapter.get('content') or '')
                 f.write("\n")
-                total_words += chapter['word_count'] or 0
+                total_words += chapter.get('word_count') or 0
         
         # Create metadata JSON
         metadata = {
@@ -722,7 +1066,8 @@ async def create_package(data: dict):
         
         for report in reports:
             report_path = f"{reports_dir}/{report['report_type']}.json"
-            content = json.loads(report['content']) if report['content'] else {}
+            rc = report.get('content')
+            content = rc if isinstance(rc, dict) else (json.loads(rc) if isinstance(rc, str) and rc else {})
             with open(report_path, 'w', encoding='utf-8') as f:
                 json.dump(content, f, ensure_ascii=False, indent=2)
         
@@ -741,30 +1086,32 @@ async def create_package(data: dict):
         # Calculate expiry (7 days)
         expires_at = datetime.utcnow() + timedelta(days=7)
         
-        # Save delivery record
+        # Save delivery record (no unique on request_id, delete old then insert)
         download_url = f"https://publisher.mrf103.com/api/shadow7/download/{tracking_id}"
         
         async with (await db.get_pool()).acquire() as conn:
+            await conn.execute(
+                "DELETE FROM shadow7_deliveries WHERE request_id = $1",
+                request_id
+            )
             await conn.execute("""
                 INSERT INTO shadow7_deliveries 
-                (request_id, zip_file_path, zip_file_url, internal_isbn, expires_at, word_count_final)
+                (request_id, zip_file_path, zip_file_url, zip_file_size, internal_isbn, expires_at)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (request_id) DO UPDATE SET
-                    zip_file_path = EXCLUDED.zip_file_path,
-                    expires_at = EXCLUDED.expires_at
             """,
                 request_id,
                 zip_path,
                 download_url,
+                os.path.getsize(zip_path) if os.path.exists(zip_path) else 0,
                 metadata['internal_isbn'],
-                expires_at,
-                total_words
+                expires_at
             )
         
         await db.log(request_id, "info", "fulfillment", f"Package created: {total_words} words")
         
         return {
             "success": True,
+            "tracking_id": tracking_id,
             "download_url": download_url,
             "expires_at": expires_at.isoformat(),
             "total_words": total_words
@@ -810,6 +1157,94 @@ async def admin_stats():
     except Exception as e:
         logger.error(f"Stats error: {e}")
         return {"error": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────
+# EMAIL ROUTES
+# ─────────────────────────────────────────────────────────────
+
+from pydantic import BaseModel, EmailStr
+from typing import List
+
+class SendEmailRequest(BaseModel):
+    to_email: str
+    subject: str
+    body_html: str
+    user_id: Optional[str] = None
+    template: Optional[str] = None
+
+class SendTemplateRequest(BaseModel):
+    to_email: str
+    template_name: str
+    user_id: Optional[str] = None
+    variables: dict = {}
+
+
+@app.post("/api/shadow7/email/send")
+async def send_email(req: SendEmailRequest, background_tasks: BackgroundTasks):
+    """Send a custom email (queued in background)"""
+    svc = get_email_service()
+    result = await svc.send_email(
+        to_email=req.to_email, subject=req.subject,
+        body_html=req.body_html, user_id=req.user_id, template=req.template
+    )
+    return result
+
+
+@app.post("/api/shadow7/email/template")
+async def send_template_email(req: SendTemplateRequest):
+    """Send a templated email (welcome, manuscript_submitted, manuscript_complete, report)"""
+    svc = get_email_service()
+    try:
+        result = await svc.send_template(
+            to_email=req.to_email, template_name=req.template_name,
+            user_id=req.user_id, **req.variables
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/shadow7/email/log")
+async def get_email_log(user_id: Optional[str] = None, limit: int = 50):
+    """Get email log entries"""
+    try:
+        async with (await db.get_pool()).acquire() as conn:
+            if user_id:
+                rows = await conn.fetch(
+                    "SELECT id, to_email, subject, template, status, error_message, "
+                    "sent_at, created_at FROM email_log WHERE user_id = $1 "
+                    "ORDER BY created_at DESC LIMIT $2",
+                    uuid.UUID(user_id), limit
+                )
+            else:
+                rows = await conn.fetch(
+                    "SELECT id, to_email, subject, template, status, error_message, "
+                    "sent_at, created_at FROM email_log "
+                    "ORDER BY created_at DESC LIMIT $1",
+                    limit
+                )
+        return [{"id": str(r["id"]), "to_email": r["to_email"], "subject": r["subject"],
+                 "template": r["template"], "status": r["status"],
+                 "error_message": r["error_message"],
+                 "sent_at": r["sent_at"].isoformat() if r["sent_at"] else None,
+                 "created_at": r["created_at"].isoformat() if r["created_at"] else None}
+                for r in rows]
+    except Exception as e:
+        logger.error(f"Email log error: {e}")
+        return []
+
+
+@app.get("/api/shadow7/email/status")
+async def email_status():
+    """Check email service configuration status"""
+    svc = get_email_service()
+    return {
+        "smtp_configured": svc.is_configured(),
+        "smtp_host": svc.smtp_host or "not set",
+        "from_email": svc.from_email,
+        "templates_available": list(TEMPLATES.keys()) if 'TEMPLATES' in dir() else ["welcome", "manuscript_submitted", "manuscript_complete", "report"]
+    }
 
 
 # ─────────────────────────────────────────────────────────────

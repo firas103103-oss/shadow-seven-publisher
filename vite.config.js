@@ -30,6 +30,11 @@ export default defineConfig(({ mode }) => ({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
+    },
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8002', changeOrigin: true },
+      '/rest': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+      '/ai': { target: 'http://127.0.0.1:11434', changeOrigin: true }
     }
   },
   preview: {

@@ -2,15 +2,16 @@ import { cn } from '@/lib/utils'
 
 export default function Card({ children, className, variant = 'default', ...props }) {
   const variants = {
-    default: 'bg-shadow-surface border-shadow-primary/20',
-    glass: 'bg-shadow-surface/50 backdrop-blur-sm border-shadow-primary/30',
-    solid: 'bg-shadow-card border-shadow-border',
+    default: 'bg-shadow-surface border-shadow-border/50 shadow-card',
+    glass: 'bg-shadow-surface/30 backdrop-blur-md border-purple-500/20 shadow-card',
+    solid: 'bg-shadow-card border-shadow-border/40',
+    glow: 'bg-shadow-surface border-purple-500/30 shadow-neon',
   }
 
   return (
     <div 
       className={cn(
-        'cyber-card rounded-lg border p-6 transition-all hover:shadow-glow',
+        'rounded-xl border p-6 transition-all duration-300 hover:border-purple-500/40',
         variants[variant],
         className
       )}
@@ -47,7 +48,7 @@ export function CardContent({ children, className, ...props }) {
 
 export function CardFooter({ children, className, ...props }) {
   return (
-    <div className={cn('mt-6 pt-4 border-t border-shadow-border', className)} {...props}>
+    <div className={cn('mt-6 pt-4 border-t border-shadow-border/40', className)} {...props}>
       {children}
     </div>
   )

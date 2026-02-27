@@ -41,26 +41,32 @@ import {
  * تحليل وتنظيف النص - نسخة محسّنة
  */
 export async function analyzeAndCleanText(rawContent, language = 'ar', logger = null) {
-  if (!rawContent || rawContent.trim().length === 0) {
+  if (rawContent == null || typeof rawContent !== 'string') {
+    throw new Error('النص المدخل فارغ أو غير صالح');
+  }
+  const content = String(rawContent);
+
+  if (!content.trim()) {
     throw new Error('النص المدخل فارغ');
   }
+  rawContent = content;
 
   // 1. حساب عدد الكلمات
   const initialWordCount = countWords(rawContent);
-  
+
   if (initialWordCount > 200000) {
     throw new Error('عدد الكلمات يتجاوز الحد الأقصى المسموح (200,000 كلمة)');
   }
-  
+
   logger?.start?.('text_analysis', { wordCount: initialWordCount, language });
 
   // 2. تحقق من Cache
-  const cacheKey = { 
-    content: rawContent.substring(0, 1000), 
+  const cacheKey = {
+    content: rawContent.substring(0, 1000),
     language,
     wordCount: initialWordCount
   };
-  
+
   const cached = await cacheManager.get('text_analysis', cacheKey);
   if (cached) {
     logger?.complete?.('text_analysis', { source: 'cache' });
@@ -69,47 +75,47 @@ export async function analyzeAndCleanText(rawContent, language = 'ar', logger = 
 
   // ===== المرحلة 1: تحليل سريع محلي (بدون LLM) =====
   logger?.progress?.('quick_analysis', { stage: 'local_nlp' });
-  
+
   // 1.1 تحليل البنية
   const structureAnalysis = quickAnalyze(rawContent);
-  
+
   // 1.2 كشف اللغة
   const detectedLanguage = detectLanguage(rawContent);
-  
+
   // 1.3 إحصائيات النص
   const stats = getTextStats(rawContent);
-  
+
   // 1.4 تقرير التكرار
   const duplicateReport = generateDuplicateReport(rawContent);
-  
+
   // 1.5 تصنيف الفقرات
   const classifications = classifyParagraphs(rawContent);
-  
+
   // 1.6 كشف المحتوى غير ذي الصلة
   const irrelevantContent = detectIrrelevant(rawContent, classifications);
 
-  logger?.complete?.('quick_analysis', { 
+  logger?.complete?.('quick_analysis', {
     localProcessing: true,
-    chapters: structureAnalysis.chapters.length,
-    pages: structureAnalysis.pages.length,
-    duplicateRate: duplicateReport.repetitionRate
+    chapters: (structureAnalysis.chapters || []).length,
+    pages: (structureAnalysis.pages || []).length,
+    duplicateRate: duplicateReport.overall?.repetitionRate ?? duplicateReport.shingles?.rate ?? 0
   });
 
   // ===== المرحلة 2: معالجة الملفات الكبيرة (>50k كلمة) =====
   let processedInChunks = false;
   let chunkResults = null;
-  
+
   if (initialWordCount > 50000) {
     logger?.start?.('chunk_processing', { words: initialWordCount });
-    
+
     const processor = new ChunkProcessor(10000);
     const chunks = processor.chunkText(rawContent);
-    
-    logger?.progress?.('chunk_processing', { 
+
+    logger?.progress?.('chunk_processing', {
       stage: 'parallel_processing',
       chunks: chunks.length
     });
-    
+
     const result = await processor.processParallel(
       chunks,
       async (chunk, index) => {
@@ -131,10 +137,10 @@ export async function analyzeAndCleanText(rawContent, language = 'ar', logger = 
         }
       }
     );
-    
+
     chunkResults = processor.mergeResults(result.results, 'analysis');
     processedInChunks = true;
-    
+
     logger?.complete?.('chunk_processing', {
       chunks: chunks.length,
       successRate: result.summary.successRate
@@ -143,34 +149,43 @@ export async function analyzeAndCleanText(rawContent, language = 'ar', logger = 
 
   // ===== المرحلة 3: تنظيف النص =====
   logger?.start?.('text_cleaning', {});
-  
+
   // 3.1 إزالة أرقام الصفحات
   let cleanedText = rawContent;
-  structureAnalysis.pages.forEach(page => {
-    const regex = new RegExp(page.match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    cleanedText = cleanedText.replace(regex, '');
+  (structureAnalysis.pages || []).forEach(page => {
+    const pattern = (page.text || page.match || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (pattern) {
+      const regex = new RegExp(pattern, 'g');
+      cleanedText = cleanedText.replace(regex, '');
+    }
   });
-  
-  // 3.2 إزالة جداول المحتويات
-  if (structureAnalysis.toc.length > 0) {
-    structureAnalysis.toc.forEach(toc => {
-      const lines = cleanedText.split('\n');
-      lines.splice(toc.startLine, toc.endLine - toc.startLine + 1);
-      cleanedText = lines.join('\n');
+
+  // 3.2 إزالة جداول المحتويات (toc قد يكون null)
+  const toc = structureAnalysis.toc;
+  if (toc && Array.isArray(toc) && toc.length > 0) {
+    toc.forEach(tocItem => {
+      if (tocItem?.startLine != null && tocItem?.endLine != null) {
+        const lines = cleanedText.split('\n');
+        lines.splice(tocItem.startLine, tocItem.endLine - tocItem.startLine + 1);
+        cleanedText = lines.join('\n');
+      }
     });
   }
-  
+
   // 3.3 إزالة التكرار (إذا كان أكثر من 20%)
-  if (duplicateReport.repetitionRate > 20) {
+  const repRate = duplicateReport.overall?.repetitionRate ?? duplicateReport.shingles?.rate ?? 0;
+  if (repRate > 20) {
     logger?.progress?.('text_cleaning', { stage: 'removing_duplicates' });
     cleanedText = removeDuplicates(cleanedText, 0.8);
   }
-  
+
   // 3.4 إزالة المحتوى غير ذي الصلة (استخدم LLM فقط إذا كان هناك محتوى كثير)
-  if (irrelevantContent.length > 5 && irrelevantContent.length / classifications.length > 0.1) {
+  const irrelevantList = Array.isArray(irrelevantContent) ? irrelevantContent : [];
+  const classificationsList = Array.isArray(classifications) ? classifications : [];
+  if (irrelevantList.length > 5 && classificationsList.length > 0 && irrelevantList.length / classificationsList.length > 0.1) {
     logger?.progress?.('text_cleaning', { stage: 'removing_irrelevant_llm' });
-    
-    const cleaningPrompt = `نظّف النص التالي من المحتوى غير ذي الصلة. تم الكشف عن ${irrelevantContent.length} فقرة غير ذات صلة.
+
+    const cleaningPrompt = `نظّف النص التالي من المحتوى غير ذي الصلة. تم الكشف عن ${irrelevantList.length} فقرة غير ذات صلة.
 
 احذف فقط:
 - الأكواد البرمجية
@@ -193,22 +208,22 @@ ${cleanedText.substring(0, 80000)}
       max_tokens: 80000
     });
     cleanedText = cleaningResult.output;
-    
+
     // ✅ التحقق من سلامة اللغة بعد التنظيف
     const languageCheck = validateLanguageIntegrity(cleanedText, rawContent);
     if (!languageCheck.passed) {
       console.warn('⚠️ تحذير: مشاكل لغوية بعد التنظيف:', languageCheck.issues);
-      logger?.progress?.('text_cleaning', { 
+      logger?.progress?.('text_cleaning', {
         warning: 'language_issues',
-        issues: languageCheck.issues 
+        issues: languageCheck.issues
       });
     }
   }
-  
+
   // ✅ التحقق من نسبة التغيير
   const cleanedWordCount = countWords(cleanedText);
   const wordPreservationRate = (cleanedWordCount / initialWordCount) * 100;
-  
+
   // تحذير إذا تم حذف أكثر من 40%
   if (wordPreservationRate < 60) {
     logger?.warn?.('excessive_deletion', {
@@ -217,8 +232,8 @@ ${cleanedText.substring(0, 80000)}
       preservationRate: wordPreservationRate.toFixed(1)
     });
   }
-  
-  logger?.complete?.('text_cleaning', { 
+
+  logger?.complete?.('text_cleaning', {
     cleanedWordCount,
     deletedWords: initialWordCount - cleanedWordCount,
     preservationRate: wordPreservationRate.toFixed(1) + '%'
@@ -226,7 +241,7 @@ ${cleanedText.substring(0, 80000)}
 
   // ===== المرحلة 4: تقسيم الفصول =====
   logger?.start?.('chapter_division', {});
-  
+
   // استخدم الخوارزمية المحلية الذكية
   const chapterDivision = smartDivideChapters(cleanedText, {
     minChapters: 2,
@@ -234,13 +249,13 @@ ${cleanedText.substring(0, 80000)}
     targetWordsPerChapter: 6000,
     preserveExisting: true
   });
-  
+
   // إذا لم تنجح الخوارزمية المحلية، استخدم LLM
   let finalChapters = chapterDivision.chapters;
-  
+
   if (chapterDivision.method === 'smart' && chapterDivision.actualChapters < 2) {
     logger?.progress?.('chapter_division', { stage: 'llm_fallback' });
-    
+
     const chapterPrompt = `قسّم النص التالي إلى فصول (2-13 فصل):
 
 النص (${cleanedWordCount} كلمة):
@@ -266,15 +281,15 @@ ${cleanedText.substring(0, 100000)}
       temperature: 0.5,
       max_tokens: 4000
     });
-    
+
     // استخراج JSON من الرد
     const llmResponse = llmResult.output;
     const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
     const llmChapters = jsonMatch ? JSON.parse(jsonMatch[0]) : { chapters: [] };
-    
+
     finalChapters = llmChapters.chapters || [];
   }
-  
+
   logger?.complete?.('chapter_division', {
     method: chapterDivision.method,
     chaptersCount: finalChapters.length
@@ -282,17 +297,17 @@ ${cleanedText.substring(0, 100000)}
 
   // ===== المرحلة 5: تعويض النقص (إذا لزم الأمر) =====
   logger?.start?.('content_compensation', {});
-  
+
   // تحقق من معايير النشر
   const wordDeficit = 50000 - cleanedWordCount; // هدف: 50k كلمة على الأقل
-  
+
   let compensatedText = cleanedText;
   if (wordDeficit > 5000 && wordDeficit < 15000) {
-    logger?.progress?.('content_compensation', { 
+    logger?.progress?.('content_compensation', {
       stage: 'llm_generation',
       deficit: wordDeficit
     });
-    
+
     const compensationPrompt = `أنت كاتب محترف. النص الحالي يحتوي على ${cleanedWordCount} كلمة ويحتاج إلى ${wordDeficit} كلمة إضافية.
 
 أضف محتوى طبيعياً يتماشى مع النص دون إضافة مشاهد جديدة:
@@ -314,7 +329,7 @@ ${cleanedText.substring(0, 50000)}
     });
     compensatedText = compensationResult.output;
   }
-  
+
   const finalWordCount = countWords(compensatedText);
   logger?.complete?.('content_compensation', { finalWordCount });
 
@@ -322,7 +337,7 @@ ${cleanedText.substring(0, 50000)}
   const result = {
     // النص النهائي
     cleaned_text: compensatedText,
-    
+
     // الإحصائيات
     statistics: {
       original_word_count: initialWordCount,
@@ -333,45 +348,45 @@ ${cleanedText.substring(0, 50000)}
       preservation_rate: ((cleanedWordCount / initialWordCount) * 100).toFixed(1) + '%',
       ...stats
     },
-    
+
     // التحليل البنيوي
     structure: {
       detected_language: detectedLanguage,
-      chapters_found: structureAnalysis.chapters.length,
-      pages_removed: structureAnalysis.pages.length,
-      toc_sections_removed: structureAnalysis.toc.length,
-      headers: structureAnalysis.headers.length,
+      chapters_found: (structureAnalysis.chapters || []).length,
+      pages_removed: (structureAnalysis.pages || []).length,
+      toc_sections_removed: (structureAnalysis.toc || []).length,
+      headers: (structureAnalysis.structure?.headers || []).length,
       processed_in_chunks: processedInChunks,
       chunk_results: chunkResults
     },
-    
+
     // تقييم الجودة
     quality: {
-      repetition_rate: duplicateReport.repetitionRate.toFixed(1) + '%',
-      duplicate_paragraphs: duplicateReport.duplicateParagraphs.length,
-      repeated_sentences: duplicateReport.repeatedSentences.length,
-      irrelevant_content_count: irrelevantContent.length,
+      repetition_rate: (duplicateReport.overall?.repetitionRate ?? duplicateReport.shingles?.rate ?? 0).toFixed(1) + '%',
+      duplicate_paragraphs: duplicateReport.paragraphs?.duplicates ?? 0,
+      repeated_sentences: duplicateReport.sentences?.repeated ?? 0,
+      irrelevant_content_count: irrelevantList.length,
       main_content_type: getMostCommonType(classifications)
     },
-    
+
     // الفصول
     chapters: finalChapters,
-    
+
     // التصنيفات
     classifications: classifications.slice(0, 20), // أول 20 فقرة
-    
+
     // التوصيات
     recommendations: generateRecommendations(
       initialWordCount,
       finalWordCount,
-      duplicateReport.repetitionRate,
-      irrelevantContent.length
+      duplicateReport.overall?.repetitionRate ?? duplicateReport.shingles?.rate ?? 0,
+      irrelevantList.length
     ),
-    
+
     // البيانات الوصفية
     metadata: {
       analysis_method: processedInChunks ? 'chunked_local_nlp' : 'local_nlp',
-      llm_calls: getUsedLLMCalls(irrelevantContent.length, chapterDivision.method, wordDeficit),
+      llm_calls: getUsedLLMCalls(irrelevantList.length, chapterDivision.method, wordDeficit),
       processing_date: new Date().toISOString(),
       version: '2.0-enhanced'
     }
@@ -401,20 +416,20 @@ export async function quickFileAnalysis(rawContent) {
   const language = detectLanguage(rawContent);
   const duplicates = generateDuplicateReport(rawContent);
   const classification = classifyContent(rawContent.substring(0, 10000));
-  
+
   return {
     word_count: stats.words,
     estimated_pages: Math.ceil(stats.words / 250),
     language,
-    detected_chapters: structure.chapters.length,
-    detected_pages: structure.pages.length,
-    has_toc: structure.toc.length > 0,
+    detected_chapters: (structure.chapters || []).length,
+    detected_pages: (structure.pages || []).length,
+    has_toc: (structure.toc || []).length > 0,
     repetition_rate: duplicates.repetitionRate,
     content_type: classification.type,
     processing_estimate: stats.words > 50000 ? 'large_file' : 'normal',
-    recommendations: stats.words > 200000 
-      ? ['الملف كبير جداً - تجاوز 200k كلمة'] 
-      : stats.words < 10000 
+    recommendations: stats.words > 200000
+      ? ['الملف كبير جداً - تجاوز 200k كلمة']
+      : stats.words < 10000
         ? ['الملف صغير جداً - أقل من 10k كلمة']
         : ['الملف مناسب للمعالجة']
   };
@@ -428,46 +443,46 @@ function getMostCommonType(classifications) {
   classifications.forEach(c => {
     typeCounts[c.type] = (typeCounts[c.type] || 0) + 1;
   });
-  
+
   return Object.entries(typeCounts)
     .sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown';
 }
 
 function generateRecommendations(original, final, repetitionRate, irrelevantCount) {
   const recommendations = [];
-  
+
   if (repetitionRate > 15) {
     recommendations.push('نسبة التكرار عالية - تم تنظيف التكرار');
   }
-  
+
   if (irrelevantCount > 10) {
     recommendations.push('تم الكشف عن محتوى غير ذي صلة - تم إزالته');
   }
-  
+
   const preservationRate = (final / original) * 100;
   if (preservationRate < 70) {
     recommendations.push('تم حذف أكثر من 30% من المحتوى - راجع النتيجة');
   }
-  
+
   if (final < 30000) {
     recommendations.push('عدد الكلمات أقل من المثالي (30k) - قد تحتاج إلى تعويض');
   }
-  
+
   return recommendations.length > 0 ? recommendations : ['النص جاهز للنشر'];
 }
 
 function getUsedLLMCalls(irrelevantCount, chapterMethod, wordDeficit) {
   let calls = 0;
-  
+
   // تنظيف المحتوى غير ذي الصلة
   if (irrelevantCount > 5) calls++;
-  
+
   // تقسيم الفصول
   if (chapterMethod !== 'existing') calls++;
-  
+
   // تعويض النقص
   if (wordDeficit > 5000 && wordDeficit < 15000) calls++;
-  
+
   return calls;
 }
 

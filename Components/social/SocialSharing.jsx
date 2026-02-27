@@ -90,7 +90,7 @@ const SocialSharing = ({ manuscript }) => {
     }));
 
     // في production، سيتم حفظ الإحصائيات في قاعدة البيانات
-    // await supabase.from('share_stats').insert({ manuscript_id, platform })
+    // إحصائيات المشاركة — يمكن ربطها بالـ Backend لاحقاً
   };
 
   // Native Web Share API (للأجهزة المحمولة)

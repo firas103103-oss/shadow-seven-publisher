@@ -11,8 +11,7 @@ afterEach(() => {
 // Mock environment variables
 vi.mock('import.meta', () => ({
   env: {
-    VITE_SUPABASE_URL: 'https://test.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'test-key',
+    VITE_API_URL: 'http://localhost:8002',
     VITE_GOOGLE_AI_API_KEY: 'test-google-ai-key',
   },
 }));

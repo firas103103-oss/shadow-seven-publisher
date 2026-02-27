@@ -56,7 +56,7 @@ echo ""
 echo "🔐 التحقق من المتغيرات البيئية..."
 
 if [ -f ".env.example" ]; then
-  required_vars=("VITE_SUPABASE_URL" "VITE_SUPABASE_ANON_KEY" "VITE_GOOGLE_AI_API_KEY")
+  required_vars=("VITE_API_URL" "VITE_GOOGLE_AI_API_KEY")
   
   for var in "${required_vars[@]}"; do
     if grep -q "$var" .env.example; then
