@@ -1,8 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { 
-  LayoutDashboard, 
-  Upload, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Upload,
+  FileText,
   BookOpen,
   FileDown,
   Settings,
@@ -49,7 +49,7 @@ export default function Layout() {
           <p className="text-[10px] tracking-[0.3em] text-purple-400/60 uppercase">Publisher</p>
         </div>
       </div>
-      
+
       {/* User info */}
       {user && (
         <div className="px-4 py-3 border-b border-shadow-border/30">
@@ -68,7 +68,9 @@ export default function Layout() {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href
+          const isActive = item.href === '/manuscripts'
+            ? (location.pathname === '/manuscripts' || location.pathname.startsWith('/elite-editor/'))
+            : (location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href + '/')))
           return (
             <Link
               key={item.name}
